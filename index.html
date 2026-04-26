@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HQ Ranch Encounters — Camels for Sale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:wght@300;400;500&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --terra:      #B85C38;
+  --terra-dark: #8C3A1E;
+  --brown:      #3D2314;
+  --brown-mid:  #6B3F28;
+  --cream:      #FAF6EE;
+  --cream-dark: #F0E8D5;
+  --sand:       #E8D5B0;
+  --ink:        #1A0C04;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Barlow', sans-serif; background: var(--cream); color: var(--brown); overflow-x: hidden; }
+
+/* NAV */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 6vw; height: 66px;
+  background: rgba(20,8,2,0.92);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(200,170,110,0.1);
+}
+.nav-logo { font-family:'Playfair Display',serif; font-size:1.1rem; color:var(--sand); letter-spacing:0.05em; text-decoration:none; }
+.nav-logo em { color:var(--terra); font-style:italic; }
+.nav-links { display:flex; gap:1.8rem; list-style:none; align-items:center; }
+.nav-links a { font-size:0.7rem; font-weight:500; letter-spacing:0.16em; text-transform:uppercase; color:#a08060; text-decoration:none; transition:color .2s; }
+.nav-links a:hover, .nav-links a.active { color:var(--sand); }
+.nav-cta { padding:0.4rem 1.2rem !important; background:var(--terra) !important; color:#fff !important; border-radius:2px; transition:background .2s !important; }
+.nav-cta:hover { background:var(--terra-dark) !important; }
+
+/* HERO */
+.hero {
+  height: 100vh; position: relative;
+  display: flex; align-items: flex-end;
+  overflow: hidden;
+}
+.hero-img {
+  position: absolute; inset: 0;
+  background: url('HQ-Farm-Sept-23-10-scaled.jpeg') center 30% / cover no-repeat;
+}
+.hero-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(20,8,2,0.88) 0%, rgba(20,8,2,0.25) 55%, transparent 100%);
+}
+.hero-content {
+  position: relative; z-index: 2;
+  padding: 0 8vw 9vh; max-width: 700px;
+}
+.eyebrow {
+  font-size: 0.68rem; font-weight: 500; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--terra); margin-bottom: 1rem; display: block;
+}
+.hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.8rem, 6vw, 5rem);
+  color: var(--sand); font-weight: 400; line-height: 1.1; margin-bottom: 1rem;
+}
+.hero h1 em { color: #fff; font-style: italic; }
+.hero p {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+  color: rgba(232,213,176,0.72); font-weight: 300; line-height: 1.65; margin-bottom: 2.2rem;
+}
+.btn {
+  display: inline-block; padding: 0.8rem 2rem;
+  background: var(--terra); color: #fff;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.16em;
+  text-transform: uppercase; text-decoration: none; border-radius: 2px;
+  transition: background .2s;
+}
+.btn:hover { background: var(--terra-dark); }
+.btn-outline {
+  display: inline-block; padding: 0.8rem 2rem; margin-left: 0.8rem;
+  border: 1px solid rgba(232,213,176,0.28); color: var(--sand);
+  font-size: 0.72rem; font-weight: 500; letter-spacing: 0.16em;
+  text-transform: uppercase; text-decoration: none; border-radius: 2px;
+  transition: border-color .2s;
+}
+.btn-outline:hover { border-color: var(--sand); }
+
+/* ABOUT STRIP */
+.about {
+  display: grid; grid-template-columns: 1fr 1fr;
+  max-width: 1160px; margin: 0 auto;
+  padding: 7rem 6vw; gap: 6rem; align-items: center;
+}
+.section-label {
+  font-size: 0.66rem; font-weight: 500; letter-spacing: 0.24em;
+  text-transform: uppercase; color: var(--terra); margin-bottom: 1rem; display: block;
+}
+.about h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 400; line-height: 1.2; margin-bottom: 1.3rem;
+}
+.about h2 em { color: var(--terra); font-style: italic; }
+.about p { font-size: 0.98rem; line-height: 1.85; color: var(--brown-mid); margin-bottom: 1rem; }
+.about p:last-of-type { margin-bottom: 2rem; }
+.about-img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 2px; display: block; }
+
+/* PHOTO ROW */
+.photo-row {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  padding: 0 6vw 7rem; max-width: 1160px; margin: 0 auto;
+}
+.photo-row img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 2px; display: block; }
+
+/* SELL CTA */
+.sell-cta {
+  background: var(--brown); padding: 7rem 6vw;
+  text-align: center;
+}
+.sell-cta h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  color: var(--sand); font-weight: 400; margin-bottom: 1rem;
+}
+.sell-cta h2 em { color: var(--terra); font-style: italic; }
+.sell-cta p {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.1rem, 2vw, 1.4rem);
+  color: rgba(232,213,176,0.65); font-weight: 300;
+  max-width: 520px; margin: 0 auto 2.5rem; line-height: 1.7;
+}
+
+/* FOOTER */
+footer {
+  background: var(--ink); padding: 2rem 6vw;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 1rem;
+  border-top: 1px solid rgba(200,170,110,0.07);
+}
+.footer-logo { font-family:'Playfair Display',serif; font-size:0.9rem; color:#6a4a2a; }
+.footer-logo em { color:var(--terra); font-style:italic; }
+.footer-copy { font-size:0.68rem; color:#4a3020; letter-spacing:0.05em; }
+.footer-links { display:flex; gap:1.4rem; list-style:none; }
+.footer-links a { font-size:0.68rem; color:#5a4030; letter-spacing:0.1em; text-decoration:none; }
+.footer-links a:hover { color:#8a6a4a; }
+
+/* FADE */
+.fade { opacity:0; transform:translateY(18px); transition:opacity .6s ease, transform .6s ease; }
+.fade.in { opacity:1; transform:none; }
+@media(max-width:768px){
+  .about { grid-template-columns:1fr; gap:3rem; }
+  .about-img { aspect-ratio:16/9; }
+  .photo-row { grid-template-columns:1fr 1fr; }
+  .photo-row img:last-child { display:none; }
+  .nav-links .hm { display:none; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo">HQ <em>Ranch</em> Encounters</a>
+  <ul class="nav-links">
+    <li><a href="index.html" class="active hm">Home</a></li>
+    <li><a href="camels.html">Camels for Sale</a></li>
+    <li><a href="camels.html" class="nav-cta">View Camels</a></li>
+  </ul>
+</nav>
+
+<section class="hero">
+  <div class="hero-img"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <span class="eyebrow">Claremore, Oklahoma</span>
+    <h1>Oklahoma's Largest<br><em>Camel Ranch</em></h1>
+    <p>Home-raised, well-handled camels available for sale. We've been breeding and raising camels in the heart of Oklahoma for years.</p>
+    <a href="camels.html" class="btn">View Camels for Sale</a>
+  </div>
+</section>
+
+<section>
+  <div class="about">
+    <div class="fade">
+      <span class="section-label">About the Ranch</span>
+      <h2>Raised Right, from <em>Day One</em></h2>
+      <p>At HQ Ranch Encounters in Claremore, Oklahoma, our camels are born and raised on-site. They're handled daily from birth — calm, socialized, and accustomed to people of all ages.</p>
+      <p>We take pride in raising healthy animals with great temperaments. Every camel we sell comes from our herd and has been cared for by us personally.</p>
+      <a href="camels.html" class="btn">See Available Camels</a>
+    </div>
+    <div class="fade">
+      <img class="about-img" src="380731544_302217785760845_4110626505817307036_n__1_.jpg" alt="Ranch owner with a camel">
+    </div>
+  </div>
+</section>
+
+<div class="photo-row">
+  <img class="fade" src="HQ-Farm-Sept-23-11-1536x1024.jpeg" alt="Girl with camel at HQ Ranch">
+  <img class="fade" src="IMG_8958.jpg" alt="Camels at the fence">
+  <img class="fade" src="409431885_3641635649454389_388684147077194582_n.jpg" alt="Group meeting a camel">
+</div>
+
+<div class="sell-cta fade">
+  <h2>Looking to Buy a <em>Camel?</em></h2>
+  <p>Browse our available animals and reach out directly. We're happy to answer any questions about our herd.</p>
+  <a href="camels.html" class="btn">View Camels for Sale</a>
+</div>
+
+<footer>
+  <span class="footer-logo">HQ <em>Ranch</em> Encounters</span>
+  <ul class="footer-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="camels.html">Camels for Sale</a></li>
+    <li><a href="mailto:info@hqencounters.com">Contact</a></li>
+  </ul>
+  <span class="footer-copy">© 2026 HQ Ranch Encounters · Claremore, Oklahoma</span>
+</footer>
+
+<script>
+const obs = new IntersectionObserver(es => es.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); }), {threshold:0.1});
+document.querySelectorAll('.fade').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
