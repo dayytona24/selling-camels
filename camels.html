@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>View Camels | HQ Ranch Encounters</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:wght@300;400;500&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles/variables.css">
+<link rel="stylesheet" href="assets/styles/base.css">
+<link rel="stylesheet" href="assets/styles/layout.css">
+<link rel="stylesheet" href="assets/styles/components.css">
+<link rel="stylesheet" href="assets/styles/listings.css">
+</head>
+<body class="site-body listings-body">
+<nav class="navbar navbar-glass">
+  <a href="index.html" class="nav-logo brand-logo">HQ <em>Ranch</em> Encounters</a>
+  <ul class="nav-links">
+    <li><a href="index.html" class="hide-mobile">Home</a></li>
+    <li><a href="camels.html" class="nav-cta active">View Camels</a></li>
+  </ul>
+</nav>
+
+<main>
+  <!-- Centered hero -->
+  <section class="listings-hero listings-hero--centered">
+    <div class="listings-hero-inner">
+      <h1>Meet the Camels</h1>
+      <p>Browse the current HQ Ranch herd, then reach out directly for details, availability, and next steps.</p>
+    </div>
+  </section>
+
+  <!-- Filter bar -->
+  <section class="filter-bar-section">
+    <div class="container">
+      <div class="filter-bar" role="group" aria-label="Filter by camel type">
+        <button class="filter-pill filter-pill--active" data-filter="all" type="button">All</button>
+        <button class="filter-pill" data-filter="Dromedary" type="button">Dromedary</button>
+        <button class="filter-pill" data-filter="Bactrian" type="button">Bactrian</button>
+        <button class="filter-pill" data-filter="Hybrid" type="button">Hybrid</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Grid -->
+  <section class="section-padded listings-grid-section">
+    <div class="container">
+      <div id="camelGrid" class="camel-grid" aria-live="polite"></div>
+      <div id="emptyState" class="empty-state" hidden>
+        <h2>No camels listed right now</h2>
+        <p>Please contact HQ Ranch Encounters for current availability.</p>
+        <div class="contact-buttons">
+          <a class="btn btn-primary" href="mailto:Hqranchcamels@gmail.com" target="_blank" rel="noopener">Email Ranch</a>
+          <a class="btn btn-secondary" href="tel:+19187063161">Call Ranch</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer ranch-footer">
+  <span class="footer-logo">HQ <em>Ranch</em> Encounters</span>
+  <ul class="footer-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="camels.html">Camels for Sale</a></li>
+    <li><a href="mailto:Hqranchcamels@gmail.com" target="_blank" rel="noopener">Contact</a></li>
+  </ul>
+  <span class="footer-copy">© 2026 HQ Ranch Encounters · Claremore, Oklahoma</span>
+</footer>
+
+<script src="assets/scripts/camels.js" defer></script>
+</body>
+</html>
