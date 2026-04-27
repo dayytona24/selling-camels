@@ -1,0 +1,721 @@
+/* ─── Page background ─────────────────────────────────────── */
+.listings-body {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  background: #fdfbd4;
+}
+
+.listings-body > main {
+  flex: 1;
+}
+
+.admin-body {
+  background: #f2eee7;
+}
+
+/* ─── Hero — centered variant ────────────────────────────── */
+.listings-hero {
+  padding: calc(var(--nav-height) + 1.8rem) var(--section-padding-x) 2.5rem;
+  background: #fdfbd4;
+  color: #153331;
+}
+
+.listings-hero--centered .listings-hero-inner {
+  max-width: 700px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.listings-hero--centered h1 {
+  color: #153331;
+  font-size: clamp(2.8rem, 6vw, 5rem);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.listings-hero--centered p {
+  max-width: 480px;
+  margin: 1rem auto 0;
+  color: rgba(21, 51, 49, 0.72);
+  font-size: 1.05rem;
+  line-height: 1.65;
+}
+
+/* ─── Filter bar ─────────────────────────────────────────── */
+.filter-bar-section {
+  padding: 0 var(--section-padding-x) 2.2rem;
+  background: #fdfbd4;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.filter-pill {
+  padding: 0.42rem 1.15rem;
+  border: 1.5px solid rgba(21, 51, 49, 0.22);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(21, 51, 49, 0.72);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.filter-pill:hover {
+  border-color: #153331;
+  color: #153331;
+}
+
+.filter-pill--active {
+  border-color: #153331;
+  background: #153331;
+  color: #f2eee7;
+}
+
+/* ─── Listings grid section ──────────────────────────────── */
+.listings-grid-section {
+  padding-top: 0;
+  padding-bottom: 3rem;
+}
+
+/* ─── Camel grid — 5 columns, nice gap ───────────────────── */
+.camel-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1.1rem;
+}
+
+@media (max-width: 1200px) {
+  .camel-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 960px) {
+  .camel-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 660px) {
+  .camel-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 420px) {
+  .camel-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── Camel card ─────────────────────────────────────────── */
+.camel-card {
+  display: grid;
+  overflow: hidden;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(48, 38, 28, 0.09);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.camel-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 40px rgba(48, 38, 28, 0.14);
+}
+
+.camel-card-image {
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  object-fit: cover;
+  background: #d8c39e;
+}
+
+.camel-card-placeholder {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(135deg, #c4a677, #efe0bd);
+  color: #2c2114;
+  font-family: var(--font-serif);
+  font-size: 2rem;
+}
+
+.camel-card-copy {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem 0.9rem 1rem;
+}
+
+.camel-card-copy h2 {
+  color: #31423a;
+  font-family: var(--font-serif);
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.camel-card-copy p {
+  color: #5f625a;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  /* clamp to 2 lines */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.camel-tag {
+  width: fit-content;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: #809b6d;
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.learn-button,
+.text-button {
+  border: 0;
+  background: transparent;
+  color: #5b3b16;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.learn-button {
+  justify-self: start;
+  margin-top: 0.3rem;
+  padding: 0.1rem 0 0.16rem;
+  border-bottom: 2px solid #c8a66d;
+  color: #5d7750;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ─── Empty state ────────────────────────────────────────── */
+.empty-state {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  border: 1px solid rgba(69, 50, 24, 0.14);
+  border-radius: 8px;
+  background: #fffaf0;
+  text-align: center;
+}
+
+.empty-state h2 { font-size: 2rem; }
+.empty-state p { margin: 0.8rem auto 1.4rem; color: rgba(0,0,0,.68); }
+
+/* ─── Modal wrapper ──────────────────────────────────────── */
+.camel-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  padding: 1rem;
+}
+
+.camel-modal.is-open {
+  display: grid;
+  place-items: center;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 10, 4, 0.76);
+}
+
+/* ─── Modal panel — two-column product layout ────────────── */
+.camel-modal-panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  align-items: start;
+  width: min(1000px, 100%);
+  max-height: min(90vh, 860px);
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fffaf0;
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.38);
+}
+
+/* ─── Close button ───────────────────────────────────────── */
+.icon-close {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  z-index: 10;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.5rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s ease;
+}
+
+.icon-close:hover { background: rgba(0,0,0,.85); }
+
+/* ─── Left column: image + strip ────────────────────────── */
+.modal-left {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #e8dfc8;
+  max-height: min(90vh, 860px);
+}
+
+.modal-main-image-wrap {
+  flex: 1;
+  min-height: 320px;
+  overflow: hidden;
+}
+
+.modal-main-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  transition: opacity 0.2s ease;
+}
+
+.modal-main-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #c4a677, #efe0bd);
+  color: #2c2114;
+  font-family: var(--font-serif);
+  font-size: 4rem;
+}
+
+/* Thumbnail strip */
+.modal-strip {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.55rem;
+  background: rgba(0,0,0,.45);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.modal-strip::-webkit-scrollbar { display: none; }
+
+.strip-thumb {
+  flex-shrink: 0;
+  width: 62px;
+  height: 50px;
+  border: 2px solid transparent;
+  border-radius: 5px;
+  overflow: hidden;
+  cursor: pointer;
+  background: transparent;
+  padding: 0;
+  opacity: 0.62;
+  transition: opacity 0.18s ease, border-color 0.18s ease;
+}
+
+.strip-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.strip-thumb:hover { opacity: 0.85; }
+.strip-thumb--active {
+  border-color: #efbf04;
+  opacity: 1;
+}
+
+/* ─── Right column: copy + inquiry card ─────────────────── */
+.modal-right {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding: 2rem 1.6rem 2rem;
+  overflow-y: auto;
+  background: #fffaf0;
+  align-items: stretch;
+}
+
+.modal-copy-inner {
+  display: grid;
+  gap: 1rem;
+}
+
+.modal-title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+  font-weight: 700;
+  color: #1a2e1d;
+  line-height: 1.15;
+}
+
+.modal-desc {
+  color: rgba(0,0,0,.68);
+  font-size: 0.97rem;
+  line-height: 1.72;
+}
+
+/* ─── Inquiry card (right column) ───────────────────────── */
+.contact-card {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(69, 50, 24, 0.14);
+  border-radius: 10px;
+  background: #f5e8cc;
+}
+
+.contact-card h3 {
+  font-size: 1.05rem;
+  font-family: var(--font-serif);
+  color: #1a2e1d;
+}
+
+.contact-card > p {
+  color: rgba(0,0,0,.65);
+  font-size: 0.87rem;
+  line-height: 1.55;
+}
+
+.contact-lines {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(0,0,0,.72);
+}
+
+.contact-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.btn-secondary {
+  border: 1px solid rgba(42, 31, 16, 0.22);
+  background: #fffaf0;
+  color: #2c2114;
+}
+
+/* ─── Footer ─────────────────────────────────────────────── */
+.ranch-footer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.8rem var(--section-padding-x);
+  background: #15110a;
+  color: var(--text-inverse);
+  border-top: none;
+}
+
+.ranch-footer .footer-logo {
+  display: inline;
+  margin-bottom: 0;
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+}
+
+.ranch-footer .footer-logo em { color: var(--accent-primary); font-style: italic; }
+
+.ranch-footer .footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.4rem;
+  margin-bottom: 0;
+  list-style: none;
+}
+
+.ranch-footer .footer-links a {
+  color: rgba(253, 251, 212, 0.72);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  transition: color 0.18s ease;
+}
+
+.ranch-footer .footer-links a:hover { color: var(--text-inverse); }
+
+.ranch-footer .footer-copy {
+  color: rgba(253, 251, 212, 0.48);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
+/* ─── Admin shell (unchanged) ────────────────────────────── */
+.admin-shell {
+  width: min(100% - 2rem, 1180px);
+  margin: 0 auto;
+  padding: calc(var(--nav-height) + 3rem) 0 4rem;
+}
+
+.admin-heading { max-width: 760px; margin-bottom: 2rem; }
+.admin-heading h1 { font-size: clamp(2.2rem, 5vw, 4rem); }
+.admin-heading p { margin-top: 0.8rem; color: rgba(0,0,0,.7); }
+
+.admin-heading .server-note {
+  width: fit-content;
+  margin-top: 1rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(69, 50, 24, 0.14);
+  border-radius: 6px;
+  background: #fffaf0;
+  color: #5b3b16;
+  font-size: 0.9rem;
+}
+
+.admin-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 430px) 1fr;
+  gap: 1.4rem;
+  align-items: start;
+}
+
+.admin-form,
+.admin-list-panel {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid rgba(69, 50, 24, 0.14);
+  border-radius: 8px;
+  background: #fffaf0;
+  padding: 1.2rem;
+  box-shadow: 0 18px 45px rgba(66, 48, 24, 0.12);
+}
+
+.form-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.form-topline h2 { font-size: 1.55rem; }
+.file-input { padding: 0.62rem; }
+
+.image-preview-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+.image-preview {
+  position: relative;
+  width: 86px;
+  height: 70px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #e2cfa9;
+}
+
+.image-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+.image-preview button {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,.72);
+  color: #fff;
+  cursor: pointer;
+}
+
+.form-status { min-height: 1.4rem; color: #5b3b16; font-weight: 600; }
+.full-button { width: 100%; }
+
+.admin-list { display: grid; gap: 0.85rem; }
+
+.admin-list-item {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.85rem;
+  border: 1px solid rgba(69, 50, 24, 0.12);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.admin-list-item h3 {
+  color: #31423a;
+  font-family: var(--font-serif);
+  font-size: 1.18rem;
+  font-weight: 700;
+}
+
+.admin-thumb {
+  width: 92px;
+  height: 78px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #d8c39e;
+}
+
+.admin-item-copy { display: grid; gap: 0.45rem; }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 0.8rem; }
+.danger-button { color: #9d2b1f; }
+
+.detail-body {
+  background: #fdfbd4;
+}
+
+.camel-detail-page {
+  width: min(100% - 2rem, 1320px);
+  margin: 0 auto;
+  padding: calc(var(--nav-height) + 3rem) 0 5rem;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 2rem;
+  color: #5d7750;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.camel-detail-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(2.5rem, 5vw, 5rem);
+  align-items: center;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.detail-media {
+  display: grid;
+  gap: 1rem;
+}
+
+.detail-main-image {
+  width: 100%;
+  aspect-ratio: 1.5 / 1;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 18px 34px rgba(48, 38, 28, 0.12);
+}
+
+.detail-image-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.detail-image-dot {
+  width: 0.78rem;
+  height: 0.78rem;
+  border: 1px solid #9aa986;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.detail-image-dot.is-active {
+  background: #809b6d;
+}
+
+.detail-copy {
+  display: grid;
+  align-content: center;
+  gap: 1.3rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.detail-copy .section-label {
+  margin-bottom: 0;
+  color: #809b6d;
+}
+
+.detail-copy h1 {
+  color: #153331;
+  font-size: clamp(2.5rem, 5vw, 4.2rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.detail-rule {
+  width: 4.2rem;
+  height: 3px;
+  background: #c8a66d;
+}
+
+.detail-copy > p {
+  color: #31423a;
+  font-size: 1.08rem;
+  line-height: 1.75;
+  white-space: pre-line;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.detail-contact {
+  margin-top: 0.8rem;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.detail-contact h2 {
+  font-size: 1.3rem;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .admin-layout { grid-template-columns: 1fr; }
+
+  .camel-detail-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .camel-modal-panel {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    max-height: min(92vh, 900px);
+    overflow-y: auto;
+  }
+
+  .modal-left {
+    max-height: 56vw;
+    min-height: 200px;
+  }
+
+  .modal-right {
+    padding: 1.4rem 1.2rem 1.6rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-list-item { grid-template-columns: 1fr; }
+  .admin-thumb { width: 100%; height: 180px; }
+  .nav-links { gap: 0.8rem; }
+
+  .filter-bar { gap: 0.45rem; }
+  .filter-pill { padding: 0.38rem 0.9rem; font-size: 0.66rem; }
+}

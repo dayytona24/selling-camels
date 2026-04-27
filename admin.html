@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camel Listings Manager | HQ Ranch Encounters</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:wght@300;400;500&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles/variables.css">
+<link rel="stylesheet" href="assets/styles/base.css">
+<link rel="stylesheet" href="assets/styles/layout.css">
+<link rel="stylesheet" href="assets/styles/components.css">
+<link rel="stylesheet" href="assets/styles/listings.css">
+</head>
+<body class="site-body admin-body">
+<nav class="navbar navbar-glass">
+  <a href="index.html" class="nav-logo brand-logo">HQ <em>Ranch</em> Encounters</a>
+  <ul class="nav-links">
+    <li><a href="camels.html">View Camels</a></li>
+    <li><a href="admin.html" class="nav-cta active">Admin</a></li>
+  </ul>
+</nav>
+
+<main class="admin-shell">
+  <section class="admin-heading">
+    <span class="section-label">Camel Listings Manager</span>
+    <h1>Manage Available Camels</h1>
+    <p>Add, update, or remove listings. Saved changes appear on the public View Camels page immediately.</p>
+    <p class="server-note">Connected to the HQ Ranch backend at <strong>localhost:3000</strong>.</p>
+  </section>
+
+  <section class="admin-layout">
+    <form id="camelForm" class="admin-form">
+      <input type="hidden" id="camelId">
+      <input type="hidden" id="keepAdditionalImages" name="keepAdditionalImages" value="[]">
+
+      <div class="form-topline">
+        <h2 id="formTitle">Add a Camel</h2>
+        <button id="resetButton" class="text-button" type="button">Clear</button>
+      </div>
+
+      <label class="form-group">
+        <span>Camel name</span>
+        <input id="name" name="name" class="input" type="text" required>
+      </label>
+
+      <label class="form-group">
+        <span>Camel type</span>
+        <select id="type" name="type" class="select" required>
+          <option value="Hybrid">Hybrid</option>
+          <option value="Dromedary">Dromedary</option>
+          <option value="Bactrian">Bactrian</option>
+        </select>
+      </label>
+
+      <label class="form-group">
+        <span>Short description</span>
+        <textarea id="shortDescription" name="shortDescription" class="textarea" rows="3" maxlength="220" required></textarea>
+      </label>
+
+      <label class="form-group">
+        <span>Long description</span>
+        <textarea id="longDescription" name="longDescription" class="textarea" rows="7" required></textarea>
+      </label>
+
+      <label class="form-group">
+        <span>Main image</span>
+        <input id="mainImage" name="mainImage" class="input file-input" type="file" accept="image/*">
+      </label>
+      <div id="mainImagePreview" class="image-preview-row"></div>
+
+      <label class="form-group">
+        <span>Additional gallery images</span>
+        <input id="additionalImages" name="additionalImages" class="input file-input" type="file" accept="image/*" multiple>
+      </label>
+      <div id="additionalPreview" class="image-preview-row"></div>
+
+      <p id="formStatus" class="form-status" role="status"></p>
+      <button class="btn btn-primary full-button" type="submit">Save Listing</button>
+    </form>
+
+    <section class="admin-list-panel">
+      <div class="form-topline">
+        <h2>Current Listings</h2>
+        <a class="text-button" href="camels.html">Public View</a>
+      </div>
+      <div id="adminList" class="admin-list"></div>
+    </section>
+  </section>
+</main>
+
+<script src="assets/scripts/admin.js?v=3" defer></script>
+</body>
+</html>
