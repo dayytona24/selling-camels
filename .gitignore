@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.local
+*.log
+npm-debug.log*
+
+# Uploaded media lives on the Railway volume, not in git.
+uploads/*
+!uploads/.gitkeep
+
+# Legacy SQLite data (not used anymore).
+data/*.sqlite

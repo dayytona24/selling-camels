@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HQ Ranch — Admin Login</title>
+  <style>
+    :root { --sand: #c9a25e; --ink: #2a2420; --muted: #7a6f63; --card: #fff; --bg: #f6f1e7; --err: #b3392c; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+    main { max-width: 340px; margin: 4rem auto; padding: 0 1.25rem; }
+    h1 { font-size: 1.4rem; text-align: center; margin-bottom: 1.5rem; }
+    form { background: var(--card); border-radius: 14px; padding: 1.5rem; box-shadow: 0 6px 20px rgba(42,36,32,.08); display: flex; flex-direction: column; gap: .75rem; }
+    label { font-size: .85rem; color: var(--muted); }
+    input { padding: .6rem .7rem; border: 1px solid #e2d8c4; border-radius: 8px; font-size: 1rem; }
+    button { margin-top: .5rem; padding: .7rem; border: none; border-radius: 8px; background: var(--sand); color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    button:hover { opacity: .9; }
+    .banner { border-radius: 8px; padding: .6rem .8rem; font-size: .85rem; margin-bottom: 1rem; }
+    .banner.error { background: #fbe4e1; color: var(--err); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>HQ Ranch Admin</h1>
+    <div id="banner" class="banner" hidden></div>
+    <form method="POST" action="/admin/login">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required autofocus autocomplete="current-password" />
+      <button type="submit">Log in</button>
+    </form>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const err = params.get('error');
+    if (err) {
+      const b = document.getElementById('banner');
+      b.textContent = err === 'ratelimited'
+        ? 'Too many attempts. Please wait a few minutes and try again.'
+        : 'Incorrect password.';
+      b.classList.add('error');
+      b.hidden = false;
+    }
+  </script>
+</body>
+</html>

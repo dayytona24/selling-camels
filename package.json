@@ -1,15 +1,21 @@
 {
-  "name": "hq-ranch-camel-listings",
+  "name": "hq-ranch-camels",
   "version": "1.0.0",
-  "private": true,
-  "description": "Camel listing manager and public camel gallery for HQ Ranch.",
-  "main": "server.js",
+  "description": "HQ Ranch camel marketplace — Express API backed by Supabase (Postgres).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node --watch server.js",
+    "seed:house-seller": "node scripts/seed-house-seller.js",
+    "smoke": "node scripts/smoke-test.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "multer": "^2.0.2"
+    "multer": "^2.0.0"
   }
 }

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HQ Ranch — Admin</title>
+  <style>
+    :root { --sand: #c9a25e; --ink: #2a2420; --muted: #7a6f63; --card: #fff; --bg: #f6f1e7; --err: #b3392c; --ok: #3f7a4a; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+    header { padding: 1.5rem 1.25rem; display: flex; align-items: center; justify-content: space-between; max-width: 720px; margin: 0 auto; }
+    header h1 { margin: 0; font-size: 1.4rem; }
+    header a { color: var(--muted); font-size: .85rem; text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+    main { max-width: 720px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+    form { background: var(--card); border-radius: 14px; padding: 1.5rem; box-shadow: 0 6px 20px rgba(42,36,32,.08); display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+    .field { display: flex; flex-direction: column; gap: .3rem; }
+    .field.full { grid-column: 1 / -1; }
+    label { font-size: .85rem; color: var(--muted); }
+    input, select, textarea { padding: .6rem .7rem; border: 1px solid #e2d8c4; border-radius: 8px; font-size: 1rem; font-family: inherit; }
+    textarea { resize: vertical; min-height: 5rem; }
+    button { grid-column: 1 / -1; padding: .8rem; border: none; border-radius: 8px; background: var(--sand); color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    button:hover { opacity: .9; }
+    .banner { border-radius: 8px; padding: .6rem .8rem; font-size: .9rem; margin-bottom: 1rem; }
+    .banner.error { background: #fbe4e1; color: var(--err); }
+    .banner.success { background: #e4f0e5; color: var(--ok); }
+    .hint { color: var(--muted); font-size: .78rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Add a camel</h1>
+    <nav>
+      <a href="/">View public listing</a>
+      &nbsp;·&nbsp;
+      <a href="/admin/logout">Log out</a>
+    </nav>
+  </header>
+  <main>
+    <div id="banner" class="banner" hidden></div>
+    <form method="POST" action="/admin/camels" enctype="multipart/form-data">
+      <input type="hidden" id="csrfToken" name="csrfToken" value="" />
+      <div class="field">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" maxlength="120" required />
+      </div>
+
+      <div class="field">
+        <label for="breed">Breed</label>
+        <select id="breed" name="breed" required>
+          <option value="Dromedary">Dromedary</option>
+          <option value="Bactrian">Bactrian</option>
+          <option value="Hybrid">Hybrid</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="sex">Sex</label>
+        <select id="sex" name="sex" required>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="ageYears">Age (years) — optional</label>
+        <input type="number" id="ageYears" name="ageYears" min="0" max="59" step="1" />
+      </div>
+
+      <div class="field">
+        <label for="priceCad">Price (CAD)</label>
+        <input type="number" id="priceCad" name="priceCad" min="0" step="0.01" required />
+      </div>
+
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status" name="status" required>
+          <option value="draft">Draft</option>
+          <option value="active" selected>Active</option>
+          <option value="pending_sale">Pending sale</option>
+          <option value="sold">Sold</option>
+          <option value="withdrawn">Withdrawn</option>
+        </select>
+        <span class="hint">Only "active" camels show on the public listing.</span>
+      </div>
+
+      <div class="field full">
+        <label for="shortDescription">Short description</label>
+        <input type="text" id="shortDescription" name="shortDescription" maxlength="200" required />
+      </div>
+
+      <div class="field full">
+        <label for="longDescription">Long description</label>
+        <textarea id="longDescription" name="longDescription" maxlength="4000" required></textarea>
+      </div>
+
+      <div class="field full">
+        <label for="mainImage">Main image — optional</label>
+        <input type="file" id="mainImage" name="mainImage" accept="image/*" />
+      </div>
+
+      <div class="field full">
+        <label for="additionalImages">Additional images — optional</label>
+        <input type="file" id="additionalImages" name="additionalImages" accept="image/*" multiple />
+      </div>
+
+      <button type="submit">Add camel</button>
+    </form>
+  </main>
+  <script>
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return match ? decodeURIComponent(match[1]) : '';
+    }
+    document.getElementById('csrfToken').value = getCookie('hq_admin_csrf');
+
+    const params = new URLSearchParams(location.search);
+    const banner = document.getElementById('banner');
+    if (params.get('success')) {
+      banner.textContent = 'Camel added successfully.';
+      banner.classList.add('success');
+      banner.hidden = false;
+    } else if (params.get('error')) {
+      banner.textContent = params.get('error');
+      banner.classList.add('error');
+      banner.hidden = false;
+    }
+  </script>
+</body>
+</html>

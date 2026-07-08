@@ -1,300 +1,580 @@
-const crypto = require("crypto");
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const { DatabaseSync } = require("node:sqlite");
+// HQ Ranch camel marketplace — Express server backed by Supabase (Postgres).
+//
+// Data access goes through the Supabase JS client (service-role key, RLS
+// bypassed) built in lib/supabase.js. Images are still uploaded via multer to
+// an on-disk uploads/ directory (a Railway volume in production) and served
+// statically — we are intentionally NOT using Supabase Storage yet.
+//
+// API contract (camelCase JSON, `camelFromRecord` shape):
+//   GET    /api/camels              public  — active listings only
+//   GET    /api/admin/camels        admin   — all statuses
+//   GET    /api/admin/camels/:id    admin
+//   POST   /api/admin/camels        admin   — create
+//   PUT    /api/admin/camels/:id    admin   — update
+//   DELETE /api/admin/camels/:id    admin   — delete
+//
+// Admin routes are protected by HTTP Basic auth (ADMIN_USER / ADMIN_PASSWORD).
+//
+// Browser admin UI (session-cookie auth, separate from the API above):
+//   GET/POST /admin/login   public  — password form (ADMIN_PASSWORD, rate-limited)
+//   GET      /admin         session — add-camel form
+//   POST     /admin/camels  session + CSRF token — create (redirects back to /admin)
+//   GET      /admin/logout  session — clears the session + CSRF cookies
 
-const express = require("express");
-const multer = require("multer");
+import 'dotenv/config';
+import express from 'express';
+import multer from 'multer';
+import path from 'node:path';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
-const app = express();
+import { getSupabase, getHouseSellerId } from './lib/supabase.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const PORT = process.env.PORT || 3000;
-const ADMIN_USER = process.env.ADMIN_USER || "admin";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "camel123";
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+const PUBLIC_DIR = path.join(__dirname, 'public');
+const VIEWS_DIR = path.join(__dirname, 'views');
 
-const rootDir = __dirname;
-const dataDir = path.join(rootDir, "data");
-const uploadsDir = path.join(rootDir, "uploads");
+// Allowed values mirror the DB CHECK constraints so we can return friendly
+// 400s instead of opaque Postgres constraint-violation errors.
+const BREEDS = ['Dromedary', 'Bactrian', 'Hybrid'];
+const SEXES = ['male', 'female'];
+const STATUSES = ['draft', 'active', 'pending_sale', 'sold', 'withdrawn'];
 
-fs.mkdirSync(dataDir, { recursive: true });
-fs.mkdirSync(uploadsDir, { recursive: true });
+// --- Supabase client + house seller resolved once at boot (fail fast) --------
+// Touch the client and the house seller id up front so a misconfigured
+// environment crashes on startup with a clear message rather than on first use.
+const supabase = getSupabase();
+const HOUSE_SELLER_ID = getHouseSellerId();
 
-function createDatabase() {
-  const projectDbPath = path.join(dataDir, "camels.sqlite");
-  const tempDbPath = path.join(os.tmpdir(), "HQ Ranch", "camels.sqlite");
-  const appDataDbPath = path.join(
-    process.env.LOCALAPPDATA || os.tmpdir(),
-    "HQ Ranch",
-    "camels.sqlite"
-  );
-
-  for (const dbPath of [projectDbPath, appDataDbPath, tempDbPath]) {
-    try {
-      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-      const database = new DatabaseSync(dbPath);
-      database.exec("CREATE TABLE IF NOT EXISTS __healthcheck (ok INTEGER)");
-      database.exec("DROP TABLE __healthcheck");
-      console.log(`Using camel database: ${dbPath}`);
-      return database;
-    } catch (error) {
-      console.warn(`Could not use database at ${dbPath}: ${error.message}`);
-    }
-  }
-
-  throw new Error("Unable to open a writable SQLite database.");
-}
-
-const db = createDatabase();
-db.exec(`
-  CREATE TABLE IF NOT EXISTS camels (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('Hybrid', 'Dromedary', 'Bactrian')),
-    main_image TEXT,
-    additional_images TEXT NOT NULL DEFAULT '[]',
-    short_description TEXT NOT NULL,
-    long_description TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-`);
+// --- Uploads ----------------------------------------------------------------
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${Date.now()}-${crypto.randomBytes(8).toString("hex")}${ext}`);
-  }
+    const base = crypto.randomBytes(16).toString('hex');
+    cb(null, `${base}${ext}`);
+  },
 });
-
 const upload = multer({
   storage,
-  limits: { fileSize: 8 * 1024 * 1024, files: 12 },
-  fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      cb(new Error("Only image uploads are supported."));
-      return;
-    }
-    cb(null, true);
-  }
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
 });
+// Admin create/update accept an optional single main image + many extra images.
+const uploadFields = upload.fields([
+  { name: 'mainImage', maxCount: 1 },
+  { name: 'additionalImages', maxCount: 20 },
+]);
 
+// --- App --------------------------------------------------------------------
+const app = express();
+// Railway terminates TLS at its edge and proxies HTTP to this process. Trust
+// its single reverse-proxy hop so req.secure/req.ip reflect the real client
+// (X-Forwarded-Proto/-For) instead of the internal HTTP connection — needed
+// for correct `secure` cookies and per-IP login rate limiting.
+app.set('trust proxy', 1);
 app.use(express.json());
-app.use("/assets", express.static(path.join(rootDir, "assets"), {
-  setHeaders(res, filePath) {
-    if (filePath.endsWith("admin.js") || filePath.endsWith("camels.js")) {
-      res.setHeader("Cache-Control", "no-store");
-    }
-  }
-}));
-app.use("/uploads", express.static(uploadsDir));
+app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(UPLOAD_DIR));
+app.use(express.static(PUBLIC_DIR));
 
+// --- Basic auth for /api/admin ----------------------------------------------
 function requireAdmin(req, res, next) {
-  const header = req.headers.authorization || "";
-  const [scheme, encoded] = header.split(" ");
-
-  if (scheme === "Basic" && encoded) {
-    const [user, password] = Buffer.from(encoded, "base64").toString("utf8").split(":");
-    if (user === ADMIN_USER && password === ADMIN_PASSWORD) {
-      return next();
-    }
+  const expectedUser = process.env.ADMIN_USER;
+  const expectedPass = process.env.ADMIN_PASSWORD;
+  if (!expectedUser || !expectedPass) {
+    return res
+      .status(500)
+      .json({ error: 'Admin credentials are not configured on the server.' });
   }
 
-  res.set("WWW-Authenticate", 'Basic realm="HQ Ranch Camel Manager"');
-  return res.status(401).send("Authentication required.");
+  const header = req.headers.authorization || '';
+  const [scheme, encoded] = header.split(' ');
+  if (scheme !== 'Basic' || !encoded) {
+    res.set('WWW-Authenticate', 'Basic realm="HQ Ranch Admin"');
+    return res.status(401).json({ error: 'Authentication required.' });
+  }
+
+  const [user, pass] = Buffer.from(encoded, 'base64').toString('utf8').split(':');
+  if (!timingSafeEqual(user, expectedUser) || !timingSafeEqual(pass, expectedPass)) {
+    res.set('WWW-Authenticate', 'Basic realm="HQ Ranch Admin"');
+    return res.status(401).json({ error: 'Invalid credentials.' });
+  }
+  return next();
 }
 
+function timingSafeEqual(a, b) {
+  const bufA = Buffer.from(String(a ?? ''));
+  const bufB = Buffer.from(String(b ?? ''));
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+// --- Session cookie auth for the browser-facing /admin/* pages --------------
+// Separate from the Basic-auth-gated /api/admin/* JSON API above. Signs a
+// short-lived expiry timestamp with HMAC-SHA256 rather than pulling in
+// express-session — the only state is "was this issued by us and not yet
+// expired", so a signed cookie is sufficient and avoids a new dependency.
+// The signing key is derived from ADMIN_PASSWORD so no extra secret needs to
+// be configured.
+const SESSION_COOKIE = 'hq_admin_session';
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h
+
+function sessionSigningKey() {
+  const pass = process.env.ADMIN_PASSWORD || '';
+  return crypto.createHash('sha256').update(`hq-admin-session:${pass}`).digest();
+}
+
+function createSessionCookieValue() {
+  const expires = Date.now() + SESSION_TTL_MS;
+  const sig = crypto.createHmac('sha256', sessionSigningKey()).update(String(expires)).digest('hex');
+  return `${expires}.${sig}`;
+}
+
+function verifySessionCookieValue(value) {
+  if (!value || typeof value !== 'string') return false;
+  const [expiresStr, sig] = value.split('.');
+  if (!expiresStr || !sig) return false;
+
+  const expected = crypto.createHmac('sha256', sessionSigningKey()).update(expiresStr).digest('hex');
+  const sigBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expected);
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return false;
+
+  const expires = Number(expiresStr);
+  return Number.isFinite(expires) && expires > Date.now();
+}
+
+function parseCookies(req) {
+  const header = req.headers.cookie;
+  const out = {};
+  if (!header) return out;
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    const val = part.slice(idx + 1).trim();
+    if (key) out[key] = decodeURIComponent(val);
+  }
+  return out;
+}
+
+function requireAdminSession(req, res, next) {
+  const cookies = parseCookies(req);
+  if (verifySessionCookieValue(cookies[SESSION_COOKIE])) return next();
+  return res.redirect('/admin/login');
+}
+
+// Shared cookie attributes for both the session and CSRF cookies. `secure` is
+// derived from the actual request (via `trust proxy`, see below) rather than
+// NODE_ENV — Railway terminates TLS at its edge and forwards HTTP internally,
+// so a NODE_ENV-gated flag silently drops `secure` if that var is ever unset.
+// req.secure reflects X-Forwarded-Proto instead, so it's correct regardless.
+function sessionCookieOptions(req, { httpOnly }) {
+  return {
+    httpOnly,
+    sameSite: 'lax',
+    secure: req.secure,
+    maxAge: SESSION_TTL_MS,
+    path: '/',
+  };
+}
+
+// --- CSRF (double-submit cookie) for POST /admin/camels ---------------------
+// Cookie-based session auth means the browser attaches the session cookie
+// automatically to any POST to this origin, including one triggered by a
+// form on another site — SameSite=Lax blocks that in modern browsers but not
+// universally, so we also require a token that a cross-site page can't read.
+// Issued alongside the session cookie at login; NOT httpOnly, since the
+// static admin.html page needs to read it via JS and echo it back as a
+// hidden form field.
+const CSRF_COOKIE = 'hq_admin_csrf';
+
+function requireCsrf(req, res, next) {
+  const cookies = parseCookies(req);
+  const cookieToken = cookies[CSRF_COOKIE];
+  const bodyToken = typeof req.body.csrfToken === 'string' ? req.body.csrfToken : '';
+  if (cookieToken && bodyToken && timingSafeEqual(cookieToken, bodyToken)) return next();
+  return res.redirect(`/admin?error=${encodeURIComponent('Your session expired. Please reload the page and try again.')}`);
+}
+
+// --- Login rate limiting -----------------------------------------------------
+// In-memory per-IP fixed window — fine for a single small Railway instance;
+// resets on restart and isn't shared across replicas, which is an accepted
+// tradeoff for a small internal tool rather than pulling in a store/dependency.
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 10;
+const loginAttempts = new Map(); // ip -> { count, windowStart }
+
+function isLoginRateLimited(ip) {
+  const entry = loginAttempts.get(ip);
+  if (!entry || Date.now() - entry.windowStart > LOGIN_WINDOW_MS) return false;
+  return entry.count >= LOGIN_MAX_ATTEMPTS;
+}
+
+function recordLoginFailure(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now - entry.windowStart > LOGIN_WINDOW_MS) {
+    loginAttempts.set(ip, { count: 1, windowStart: now });
+  } else {
+    entry.count += 1;
+  }
+}
+
+function recordLoginSuccess(ip) {
+  loginAttempts.delete(ip);
+}
+
+// --- Serialization ----------------------------------------------------------
+// Convert a DB camel row (+ joined camel_images) into the camelCase response
+// shape the frontend expects. New fields are added additively; `type` is kept
+// as an alias of `breed` for backward compatibility with the old contract.
 function camelFromRecord(row) {
+  const images = Array.isArray(row.camel_images) ? [...row.camel_images] : [];
+  images.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
   return {
     id: row.id,
     name: row.name,
-    type: row.type,
-    mainImage: row.main_image || "",
-    additionalImages: JSON.parse(row.additional_images || "[]"),
+    breed: row.breed,
+    type: row.breed, // legacy alias
+    sex: row.sex,
+    ageYears: row.age_years === null || row.age_years === undefined ? null : Number(row.age_years),
+    priceCad: row.price_cad === null || row.price_cad === undefined ? null : Number(row.price_cad),
+    status: row.status,
+    mainImage: row.main_image ?? null,
+    additionalImages: images.map((img) => img.url),
     shortDescription: row.short_description,
     longDescription: row.long_description,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
   };
 }
 
-function uploadedPath(file) {
-  return file ? `/uploads/${file.filename}` : "";
+const SELECT_WITH_IMAGES = '*, camel_images(url, sort_order)';
+
+// --- Input parsing ----------------------------------------------------------
+function firstFile(files, field) {
+  return files && files[field] && files[field][0] ? files[field][0] : null;
 }
 
-function readCamelPayload(req, existingCamel) {
-  const body = req.body;
-  const name = String(body.name || "").trim();
-  const type = String(body.type || "").trim();
-  const shortDescription = String(body.shortDescription || "").trim();
-  const longDescription = String(body.longDescription || "").trim();
+// Resolve the list of additional image URLs from a request. Newly uploaded
+// files (multer) become /uploads/<name>; any URLs passed in the body (e.g.
+// existing images to keep on update) are preserved. Uploaded files come last.
+function resolveAdditionalImages(body, files) {
+  const urls = [];
 
-  if (!name || !type || !shortDescription || !longDescription) {
-    const error = new Error("Name, type, short description, and long description are required.");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!["Hybrid", "Dromedary", "Bactrian"].includes(type)) {
-    const error = new Error("Camel type must be Hybrid, Dromedary, or Bactrian.");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const mainImageUpload = req.files?.mainImage?.[0];
-  const additionalUploads = req.files?.additionalImages || [];
-  const existingAdditional = existingCamel?.additionalImages || [];
-  let keptAdditional = existingAdditional;
-
-  if (body.keepAdditionalImages) {
-    try {
-      const parsed = JSON.parse(body.keepAdditionalImages);
-      keptAdditional = Array.isArray(parsed) ? parsed.filter(Boolean) : existingAdditional;
-    } catch {
-      keptAdditional = existingAdditional;
-    }
-  }
-
-  return {
-    name,
-    type,
-    shortDescription,
-    longDescription,
-    mainImage: uploadedPath(mainImageUpload) || existingCamel?.mainImage || "",
-    additionalImages: [
-      ...keptAdditional,
-      ...additionalUploads.map(uploadedPath)
-    ]
-  };
-}
-
-app.get("/api/camels", (_req, res, next) => {
-  try {
-    const rows = db.prepare("SELECT * FROM camels ORDER BY updated_at DESC, created_at DESC").all();
-    res.json(rows.map(camelFromRecord));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/admin/camels", requireAdmin, (_req, res, next) => {
-  try {
-    const rows = db.prepare("SELECT * FROM camels ORDER BY updated_at DESC, created_at DESC").all();
-    res.json(rows.map(camelFromRecord));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post(
-  "/api/admin/camels",
-  requireAdmin,
-  upload.fields([
-    { name: "mainImage", maxCount: 1 },
-    { name: "additionalImages", maxCount: 10 }
-  ]),
-  (req, res, next) => {
-    try {
-      const camel = readCamelPayload(req);
-      const id = crypto.randomUUID();
-      db.prepare(`
-        INSERT INTO camels (id, name, type, main_image, additional_images, short_description, long_description)
-        VALUES (@id, @name, @type, @mainImage, @additionalImages, @shortDescription, @longDescription)
-      `).run({
-        id,
-        ...camel,
-        additionalImages: JSON.stringify(camel.additionalImages)
-      });
-
-      const row = db.prepare("SELECT * FROM camels WHERE id = ?").get(id);
-      res.status(201).json(camelFromRecord(row));
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-app.put(
-  "/api/admin/camels/:id",
-  requireAdmin,
-  upload.fields([
-    { name: "mainImage", maxCount: 1 },
-    { name: "additionalImages", maxCount: 10 }
-  ]),
-  (req, res, next) => {
-    try {
-      const existing = db.prepare("SELECT * FROM camels WHERE id = ?").get(req.params.id);
-      if (!existing) {
-        res.status(404).json({ error: "Camel not found." });
-        return;
+  const raw = body.additionalImages;
+  if (raw !== undefined && raw !== null) {
+    let parsed = raw;
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (trimmed.startsWith('[')) {
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch {
+          parsed = [trimmed];
+        }
+      } else if (trimmed.length > 0) {
+        parsed = [trimmed];
+      } else {
+        parsed = [];
       }
-
-      const camel = readCamelPayload(req, camelFromRecord(existing));
-      db.prepare(`
-        UPDATE camels
-        SET name = @name,
-            type = @type,
-            main_image = @mainImage,
-            additional_images = @additionalImages,
-            short_description = @shortDescription,
-            long_description = @longDescription,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = @id
-      `).run({
-        id: req.params.id,
-        ...camel,
-        additionalImages: JSON.stringify(camel.additionalImages)
-      });
-
-      const row = db.prepare("SELECT * FROM camels WHERE id = ?").get(req.params.id);
-      res.json(camelFromRecord(row));
-    } catch (error) {
-      next(error);
+    }
+    if (Array.isArray(parsed)) {
+      for (const v of parsed) {
+        if (typeof v === 'string' && v.trim()) urls.push(v.trim());
+      }
     }
   }
-);
 
-app.delete("/api/admin/camels/:id", requireAdmin, (req, res, next) => {
-  try {
-    const result = db.prepare("DELETE FROM camels WHERE id = ?").run(req.params.id);
-    if (!result.changes) {
-      res.status(404).json({ error: "Camel not found." });
-      return;
-    }
+  const uploaded = (files && files.additionalImages) || [];
+  for (const f of uploaded) urls.push(`/uploads/${f.filename}`);
 
-    res.status(204).end();
-  } catch (error) {
-    next(error);
+  return urls;
+}
+
+function resolveMainImage(body, files) {
+  const file = firstFile(files, 'mainImage');
+  if (file) return `/uploads/${file.filename}`;
+  if (typeof body.mainImage === 'string' && body.mainImage.trim()) return body.mainImage.trim();
+  return undefined; // undefined => "not provided", null would mean "clear it"
+}
+
+function toNumberOrError(value, label) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return { error: `${label} must be a number.` };
+  return { value: n };
+}
+
+// Build the DB record for a create/update. `partial` allows PUT to touch only
+// the fields that were actually sent. Returns { record, error }.
+function buildCamelRecord(body, { partial }) {
+  const record = {};
+  const errors = [];
+  const has = (k) => body[k] !== undefined && body[k] !== null && body[k] !== '';
+
+  // breed accepts new `breed` or legacy `type`.
+  const breedValue = has('breed') ? body.breed : has('type') ? body.type : undefined;
+  if (breedValue !== undefined) {
+    if (!BREEDS.includes(breedValue)) errors.push(`breed must be one of: ${BREEDS.join(', ')}.`);
+    else record.breed = breedValue;
+  } else if (!partial) {
+    errors.push('breed is required.');
   }
+
+  if (has('name')) record.name = String(body.name);
+  else if (!partial) errors.push('name is required.');
+
+  if (has('sex')) {
+    if (!SEXES.includes(body.sex)) errors.push(`sex must be one of: ${SEXES.join(', ')}.`);
+    else record.sex = body.sex;
+  } else if (!partial) {
+    errors.push('sex is required.');
+  }
+
+  if (has('priceCad')) {
+    const r = toNumberOrError(body.priceCad, 'priceCad');
+    if (r.error) errors.push(r.error);
+    else if (r.value < 0) errors.push('priceCad must be >= 0.');
+    else record.price_cad = r.value;
+  } else if (!partial) {
+    errors.push('priceCad is required.');
+  }
+
+  if (has('shortDescription')) record.short_description = String(body.shortDescription);
+  else if (!partial) errors.push('shortDescription is required.');
+
+  if (has('longDescription')) record.long_description = String(body.longDescription);
+  else if (!partial) errors.push('longDescription is required.');
+
+  // Optional fields.
+  if (has('ageYears')) {
+    const r = toNumberOrError(body.ageYears, 'ageYears');
+    if (r.error) errors.push(r.error);
+    else if (r.value < 0 || r.value >= 60) errors.push('ageYears must be >= 0 and < 60.');
+    else record.age_years = r.value;
+  } else if (body.ageYears === null || body.ageYears === '') {
+    record.age_years = null;
+  }
+
+  if (has('status')) {
+    if (!STATUSES.includes(body.status)) errors.push(`status must be one of: ${STATUSES.join(', ')}.`);
+    else record.status = body.status;
+  }
+
+  if (errors.length > 0) return { error: errors.join(' ') };
+  return { record };
+}
+
+// Replace the camel_images rows for a camel with the given ordered URLs.
+async function replaceCamelImages(camelId, urls) {
+  const { error: delErr } = await supabase.from('camel_images').delete().eq('camel_id', camelId);
+  if (delErr) throw delErr;
+  if (!urls || urls.length === 0) return;
+
+  const rows = urls.map((url, i) => ({ camel_id: camelId, url, sort_order: i }));
+  const { error: insErr } = await supabase.from('camel_images').insert(rows);
+  if (insErr) throw insErr;
+}
+
+function asyncHandler(fn) {
+  return (req, res) => Promise.resolve(fn(req, res)).catch((err) => {
+    console.error(`[${req.method} ${req.originalUrl}]`, err);
+    res.status(500).json({ error: 'Internal server error.', detail: err.message });
+  });
+}
+
+// --- Routes -----------------------------------------------------------------
+
+app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// Public: active listings only.
+app.get('/api/camels', asyncHandler(async (_req, res) => {
+  const { data, error } = await supabase
+    .from('camels')
+    .select(SELECT_WITH_IMAGES)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  res.json(data.map(camelFromRecord));
+}));
+
+// Admin: list all statuses.
+app.get('/api/admin/camels', requireAdmin, asyncHandler(async (_req, res) => {
+  const { data, error } = await supabase
+    .from('camels')
+    .select(SELECT_WITH_IMAGES)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  res.json(data.map(camelFromRecord));
+}));
+
+// Admin: single record (any status).
+app.get('/api/admin/camels/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const { data, error } = await supabase
+    .from('camels')
+    .select(SELECT_WITH_IMAGES)
+    .eq('id', req.params.id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return res.status(404).json({ error: 'Camel not found.' });
+  res.json(camelFromRecord(data));
+}));
+
+// Shared create logic for both the JSON API (POST /api/admin/camels) and the
+// browser form (POST /admin/camels) — one code path writes to `camels`.
+async function createCamelFromRequest(body, files) {
+  const { record, error } = buildCamelRecord(body, { partial: false });
+  if (error) return { error };
+
+  const mainImage = resolveMainImage(body, files);
+  if (mainImage !== undefined) record.main_image = mainImage;
+  record.seller_id = HOUSE_SELLER_ID;
+
+  const { data, error: insErr } = await supabase
+    .from('camels')
+    .insert(record)
+    .select('id')
+    .single();
+  if (insErr) return { error: insErr.message };
+
+  const additional = resolveAdditionalImages(body, files);
+  await replaceCamelImages(data.id, additional);
+
+  const { data: full, error: readErr } = await supabase
+    .from('camels')
+    .select(SELECT_WITH_IMAGES)
+    .eq('id', data.id)
+    .single();
+  if (readErr) throw readErr;
+  return { camel: camelFromRecord(full) };
+}
+
+// Admin: create.
+app.post('/api/admin/camels', requireAdmin, uploadFields, asyncHandler(async (req, res) => {
+  const { camel, error } = await createCamelFromRequest(req.body, req.files);
+  if (error) return res.status(400).json({ error });
+  res.status(201).json(camel);
+}));
+
+// Admin: update (partial — only provided fields change).
+app.put('/api/admin/camels/:id', requireAdmin, uploadFields, asyncHandler(async (req, res) => {
+  const id = req.params.id;
+
+  const { record, error } = buildCamelRecord(req.body, { partial: true });
+  if (error) return res.status(400).json({ error });
+
+  const mainImage = resolveMainImage(req.body, req.files);
+  if (mainImage !== undefined) record.main_image = mainImage;
+  record.updated_at = new Date().toISOString();
+
+  const { data: updated, error: updErr } = await supabase
+    .from('camels')
+    .update(record)
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+  if (updErr) return res.status(400).json({ error: updErr.message });
+  if (!updated) return res.status(404).json({ error: 'Camel not found.' });
+
+  // Only touch images if the request actually carried image info.
+  const sentImages =
+    req.body.additionalImages !== undefined ||
+    (req.files && req.files.additionalImages && req.files.additionalImages.length > 0);
+  if (sentImages) {
+    await replaceCamelImages(id, resolveAdditionalImages(req.body, req.files));
+  }
+
+  const { data: full, error: readErr } = await supabase
+    .from('camels')
+    .select(SELECT_WITH_IMAGES)
+    .eq('id', id)
+    .single();
+  if (readErr) throw readErr;
+  res.json(camelFromRecord(full));
+}));
+
+// Admin: delete (remove child images first to satisfy the FK).
+app.delete('/api/admin/camels/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const id = req.params.id;
+
+  const { error: imgErr } = await supabase.from('camel_images').delete().eq('camel_id', id);
+  if (imgErr) throw imgErr;
+
+  const { data, error } = await supabase
+    .from('camels')
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return res.status(404).json({ error: 'Camel not found.' });
+  res.json({ ok: true, id });
+}));
+
+// --- Browser-facing admin pages (session-cookie auth, separate from the ------
+// --- Basic-auth JSON API above) ----------------------------------------------
+
+app.get('/admin/login', (req, res) => {
+  res.sendFile(path.join(VIEWS_DIR, 'admin-login.html'));
 });
 
-app.get(["/admin", "/admin.html"], requireAdmin, (_req, res) => {
-  const html = fs
-    .readFileSync(path.join(rootDir, "admin.html"), "utf8")
-    .replace("assets/scripts/admin.js?v=3", `assets/scripts/admin.js?v=${Date.now()}`);
+app.post('/admin/login', (req, res) => {
+  const expectedPass = process.env.ADMIN_PASSWORD;
+  if (!expectedPass) {
+    return res.status(500).send('Admin credentials are not configured on the server.');
+  }
 
-  res.set("Cache-Control", "no-store");
-  res.type("html").send(html);
+  if (isLoginRateLimited(req.ip)) {
+    return res.redirect('/admin/login?error=ratelimited');
+  }
+
+  const submitted = typeof req.body.password === 'string' ? req.body.password : '';
+  if (!timingSafeEqual(submitted, expectedPass)) {
+    recordLoginFailure(req.ip);
+    return res.redirect('/admin/login?error=1');
+  }
+  recordLoginSuccess(req.ip);
+
+  res.cookie(SESSION_COOKIE, createSessionCookieValue(), sessionCookieOptions(req, { httpOnly: true }));
+  res.cookie(CSRF_COOKIE, crypto.randomBytes(32).toString('hex'), sessionCookieOptions(req, { httpOnly: false }));
+  res.redirect('/admin');
 });
 
-app.get(["/", "/index.html"], (_req, res) => {
-  res.sendFile(path.join(rootDir, "index.html"));
+app.get('/admin/logout', (req, res) => {
+  res.clearCookie(SESSION_COOKIE, { path: '/' });
+  res.clearCookie(CSRF_COOKIE, { path: '/' });
+  res.redirect('/admin/login');
 });
 
-app.get("/camels.html", (_req, res) => {
-  res.sendFile(path.join(rootDir, "camels.html"));
+app.get('/admin', requireAdminSession, (req, res) => {
+  res.sendFile(path.join(VIEWS_DIR, 'admin.html'));
 });
 
-app.get("/camel-detail.html", (_req, res) => {
-  res.sendFile(path.join(rootDir, "camel-detail.html"));
-});
+app.post('/admin/camels', requireAdminSession, uploadFields, requireCsrf, asyncHandler(async (req, res) => {
+  const { error } = await createCamelFromRequest(req.body, req.files);
+  if (error) return res.redirect(`/admin?error=${encodeURIComponent(error)}`);
+  res.redirect('/admin?success=1');
+}));
 
-app.use((error, _req, res, _next) => {
-  const status = error.statusCode || 500;
-  res.status(status).json({ error: error.message || "Something went wrong." });
+// Multer error surfacing (e.g. file too large).
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (req.path === '/admin/camels') {
+      return res.redirect(`/admin?error=${encodeURIComponent('Upload error: ' + err.message)}`);
+    }
+    return res.status(400).json({ error: `Upload error: ${err.message}` });
+  }
+  return next(err);
 });
 
 app.listen(PORT, () => {
-  console.log(`HQ Ranch camel listings running at http://localhost:${PORT}`);
-  console.log(`Admin login: ${ADMIN_USER} / ${ADMIN_PASSWORD}`);
+  console.log(`HQ Ranch server listening on http://localhost:${PORT}`);
 });
