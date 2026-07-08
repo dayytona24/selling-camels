@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HQ Ranch — Camel Marketplace (dev repo)</title>
+  <title>HQ Ranch — Camels for Sale</title>
   <style>
     :root { --sand: #c9a25e; --ink: #2a2420; --muted: #7a6f63; --card: #fff; --bg: #f6f1e7; }
     * { box-sizing: border-box; }
@@ -11,11 +11,17 @@
     header { padding: 2rem 1.25rem; text-align: center; background: linear-gradient(180deg, #efe4cd, var(--bg)); }
     header h1 { margin: 0; font-size: 2rem; letter-spacing: .02em; }
     header p { margin: .4rem 0 0; color: var(--muted); }
-    main { max-width: 640px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
-    .card { background: var(--card); border-radius: 14px; padding: 1.5rem; box-shadow: 0 6px 20px rgba(42,36,32,.08); }
-    .card p { line-height: 1.5; }
-    .card a { color: var(--sand); font-weight: 600; }
-    code { background: #efe4cd; padding: .1rem .35rem; border-radius: 4px; font-size: .9em; }
+    main { max-width: 1080px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+    .grid { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .card { background: var(--card); border-radius: 14px; overflow: hidden; box-shadow: 0 6px 20px rgba(42,36,32,.08); display: flex; flex-direction: column; }
+    .card img { width: 100%; height: 180px; object-fit: cover; background: #e7ddca; }
+    .card .body { padding: 1rem; display: flex; flex-direction: column; gap: .35rem; flex: 1; }
+    .card h2 { margin: 0; font-size: 1.15rem; }
+    .badges { display: flex; gap: .4rem; flex-wrap: wrap; }
+    .badge { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; background: #efe4cd; color: #6b5a37; padding: .15rem .5rem; border-radius: 999px; }
+    .price { font-weight: 700; color: var(--sand); font-size: 1.1rem; }
+    .desc { color: var(--muted); font-size: .9rem; }
+    .state { text-align: center; color: var(--muted); padding: 3rem 0; }
   </style>
 </head>
 <body>
@@ -24,14 +30,76 @@
     <p>Premium dromedary, bactrian &amp; hybrid camels — available now</p>
   </header>
   <main>
-    <div class="card">
-      <p><strong>This is the development repository</strong>, not the live site.</p>
-      <p>HQ Ranch is an Express + Supabase app — the camel listings and admin
-      tools require a running server, which GitHub Pages (static hosting)
-      can't provide. See <a href="README.md">README.md</a> for local setup
-      and the Railway deployment steps.</p>
-      <p>Public listing page source: <code>public/index.html</code>.</p>
-    </div>
+    <div id="state" class="state">Loading available camels…</div>
+    <div id="grid" class="grid"></div>
   </main>
+
+  <script>
+    // GitHub Pages is static hosting — there's no Express server here, so this
+    // page talks to Supabase directly instead of a relative /api/camels call.
+    // The key below is the anon/publishable key, not the service-role key: it
+    // is meant to be public and is restricted by a Postgres RLS policy
+    // (camels_public_read_active) to only ever return status='active' rows,
+    // the same restriction the real server's GET /api/camels enforces.
+    const SUPABASE_URL = 'https://yygsstlijqddfddzzyke.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_dAEfEp4uFubZsK5wQo69pw_yIc98avq';
+
+    const CAD = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 });
+
+    function camelFromRow(row) {
+      const images = Array.isArray(row.camel_images) ? [...row.camel_images] : [];
+      images.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      return {
+        name: row.name,
+        breed: row.breed,
+        sex: row.sex,
+        ageYears: row.age_years === null || row.age_years === undefined ? null : Number(row.age_years),
+        priceCad: row.price_cad === null || row.price_cad === undefined ? null : Number(row.price_cad),
+        mainImage: row.main_image ?? null,
+        additionalImages: images.map((img) => img.url),
+        shortDescription: row.short_description,
+      };
+    }
+
+    function card(c) {
+      const img = c.mainImage || (c.additionalImages && c.additionalImages[0]) || '';
+      const el = document.createElement('article');
+      el.className = 'card';
+      el.innerHTML = `
+        ${img ? `<img src="${img}" alt="${c.name}" loading="lazy" />` : '<div style="height:180px;background:#e7ddca"></div>'}
+        <div class="body">
+          <div class="badges">
+            <span class="badge">${c.breed}</span>
+            <span class="badge">${c.sex}</span>
+            ${c.ageYears != null ? `<span class="badge">${c.ageYears} yr</span>` : ''}
+          </div>
+          <h2>${c.name}</h2>
+          <div class="price">${c.priceCad != null ? CAD.format(c.priceCad) : 'Inquire'}</div>
+          <p class="desc">${c.shortDescription || ''}</p>
+        </div>`;
+      return el;
+    }
+
+    async function load() {
+      const state = document.getElementById('state');
+      const grid = document.getElementById('grid');
+      try {
+        const url = `${SUPABASE_URL}/rest/v1/camels?select=*,camel_images(url,sort_order)&status=eq.active&order=created_at.desc`;
+        const res = await fetch(url, {
+          headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        });
+        if (!res.ok) throw new Error('Request failed (' + res.status + ')');
+        const rows = await res.json();
+        const camels = rows.map(camelFromRow);
+        if (!camels.length) { state.textContent = 'No camels available right now — check back soon.'; return; }
+        state.style.display = 'none';
+        for (const c of camels) grid.appendChild(card(c));
+      } catch (err) {
+        state.textContent = 'Could not load listings. Please try again later.';
+        console.error(err);
+      }
+    }
+    load();
+  </script>
 </body>
 </html>
