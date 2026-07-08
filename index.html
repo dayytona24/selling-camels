@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HQ Ranch — Camel Marketplace (dev repo)</title>
+  <style>
+    :root { --sand: #c9a25e; --ink: #2a2420; --muted: #7a6f63; --card: #fff; --bg: #f6f1e7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+    header { padding: 2rem 1.25rem; text-align: center; background: linear-gradient(180deg, #efe4cd, var(--bg)); }
+    header h1 { margin: 0; font-size: 2rem; letter-spacing: .02em; }
+    header p { margin: .4rem 0 0; color: var(--muted); }
+    main { max-width: 640px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    .card { background: var(--card); border-radius: 14px; padding: 1.5rem; box-shadow: 0 6px 20px rgba(42,36,32,.08); }
+    .card p { line-height: 1.5; }
+    .card a { color: var(--sand); font-weight: 600; }
+    code { background: #efe4cd; padding: .1rem .35rem; border-radius: 4px; font-size: .9em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>HQ Ranch</h1>
+    <p>Premium dromedary, bactrian &amp; hybrid camels — available now</p>
+  </header>
+  <main>
+    <div class="card">
+      <p><strong>This is the development repository</strong>, not the live site.</p>
+      <p>HQ Ranch is an Express + Supabase app — the camel listings and admin
+      tools require a running server, which GitHub Pages (static hosting)
+      can't provide. See <a href="README.md">README.md</a> for local setup
+      and the Railway deployment steps.</p>
+      <p>Public listing page source: <code>public/index.html</code>.</p>
+    </div>
+  </main>
+</body>
+</html>
