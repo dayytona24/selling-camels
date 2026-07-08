@@ -10,3 +10,11 @@ uploads/*
 
 # Legacy SQLite data (not used anymore).
 data/*.sqlite
+
+# Local Claude Code settings (machine-specific, not shared).
+.claude/
+
+# Pre-migration SQLite prototype, kept locally as a safety backup only —
+# already preserved in git history (commits before "Migrate to
+# Supabase-backed app with browser admin UI").
+_legacy-sqlite-backup/
