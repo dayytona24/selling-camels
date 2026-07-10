@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gallery — HQ Encounters</title>
+  <meta name="description" content="A close look at the camels of HQ Encounters, Oklahoma's premier camel ranch." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="container nav__inner">
+      <a class="brand" href="index.html">HQ&nbsp;<span>Encounters</span></a>
+      <nav class="nav__links" aria-label="Primary">
+        <a href="index.html">Ranch</a>
+        <a href="listings.html">Camels</a>
+        <a href="gallery.html" aria-current="page">Gallery</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="container">
+        <div class="section__head">
+          <p class="eyebrow">The Herd, Up Close</p>
+          <h2>Gallery</h2>
+          <p>Every photo here is one of our own camels. Click any image to open it full-screen.</p>
+        </div>
+        <div class="masonry" id="masonry">
+          <div class="state" id="state">Loading photos&hellip;</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__top">
+        <a class="footer__brand" href="index.html">HQ Encounters</a>
+        <a class="footer__cta" href="listings.html">See What's For Sale <span class="btn__arrow" aria-hidden="true">&rarr;</span></a>
+      </div>
+      <div class="footer__bottom">
+        <span>Oklahoma's premier camel ranch</span>
+        <span><a href="mailto:Hqranchcamels@gmail.com">Hqranchcamels@gmail.com</a> &nbsp;·&nbsp; <a href="tel:+19187063161">+1 (918) 706-3161</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/site.js"></script>
+  <script>
+    (async function () {
+      var masonry = document.getElementById("masonry");
+      var state = document.getElementById("state");
+      var lightbox = HQ.createLightbox();
+
+      var rows;
+      try {
+        rows = await HQ.fetchGalleryPhotos();
+      } catch (err) {
+        console.error("Could not load gallery photos:", err);
+        state.className = "state state--error";
+        state.textContent = "We couldn't load the gallery just now. Please refresh, or check back soon.";
+        return;
+      }
+
+      if (!rows.length) {
+        state.textContent = "No gallery photos yet. Check back soon.";
+        return;
+      }
+
+      var photos = rows.map(function (r) {
+        return { src: r.photoUrl, alt: r.caption || "A camel at HQ Encounters" };
+      });
+
+      state.remove();
+      photos.forEach(function (photo, i) {
+        var btn = document.createElement("button");
+        btn.className = "masonry__item";
+        btn.type = "button";
+        btn.setAttribute("aria-label", "View photo: " + photo.alt);
+        btn.innerHTML = '<img src="' + HQ.esc(photo.src) + '" alt="' + HQ.esc(photo.alt) +
+          '" loading="lazy" onerror="this.closest(\'button\').style.display=\'none\'" />';
+        btn.addEventListener("click", function () { lightbox.open(photos, i); });
+        masonry.appendChild(btn);
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -3,75 +3,75 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HQ Ranch — Camels for Sale</title>
-  <style>
-    :root { --sand: #c9a25e; --ink: #2a2420; --muted: #7a6f63; --card: #fff; --bg: #f6f1e7; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--ink); background: var(--bg); }
-    header { padding: 2rem 1.25rem; text-align: center; background: linear-gradient(180deg, #efe4cd, var(--bg)); }
-    header h1 { margin: 0; font-size: 2rem; letter-spacing: .02em; }
-    header p { margin: .4rem 0 0; color: var(--muted); }
-    main { max-width: 1080px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
-    .grid { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-    .card { background: var(--card); border-radius: 14px; overflow: hidden; box-shadow: 0 6px 20px rgba(42,36,32,.08); display: flex; flex-direction: column; }
-    .card img { width: 100%; height: 180px; object-fit: cover; background: #e7ddca; }
-    .card .body { padding: 1rem; display: flex; flex-direction: column; gap: .35rem; flex: 1; }
-    .card h2 { margin: 0; font-size: 1.15rem; }
-    .badges { display: flex; gap: .4rem; flex-wrap: wrap; }
-    .badge { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; background: #efe4cd; color: #6b5a37; padding: .15rem .5rem; border-radius: 999px; }
-    .price { font-weight: 700; color: var(--sand); font-size: 1.1rem; }
-    .desc { color: var(--muted); font-size: .9rem; }
-    .state { text-align: center; color: var(--muted); padding: 3rem 0; }
-  </style>
+  <title>HQ Encounters — Oklahoma's Premier Camel Ranch</title>
+  <meta name="description" content="HQ Encounters is Oklahoma's largest camel ranch, offering world-class Dromedary, Bactrian, and Hybrid camels to serious buyers." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
 </head>
 <body>
-  <header>
-    <h1>HQ Ranch</h1>
-    <p>Premium dromedary, bactrian &amp; hybrid camels — available now</p>
+  <!-- Navigation -->
+  <header class="nav">
+    <div class="container nav__inner">
+      <a class="brand" href="index.html">HQ&nbsp;<span>Encounters</span></a>
+      <nav class="nav__links" aria-label="Primary">
+        <a href="index.html" aria-current="page">Ranch</a>
+        <a href="listings.html">Camels</a>
+        <a href="gallery.html">Gallery</a>
+      </nav>
+    </div>
   </header>
+
   <main>
-    <div id="state" class="state">Loading available camels…</div>
-    <div id="grid" class="grid"></div>
+    <!-- Hero -->
+    <section class="hero" id="hero">
+      <img class="hero__bg" src="assets/img/ranch-5.jpg" alt="" aria-hidden="true" onerror="this.remove()" />
+      <div class="container hero__inner">
+        <p class="eyebrow hero__eyebrow">Dromedary &middot; Bactrian &middot; Hybrid</p>
+        <h1 class="hero__title">HQ Encounters: Oklahoma's <em>Premier</em> Camel Ranch</h1>
+        <p class="hero__sub">Sourcing world-class Dromedary, Bactrian, and Hybrid camels for serious buyers.</p>
+        <div class="hero__cta">
+          <a class="btn" href="listings.html">View Available Camels <span class="btn__arrow" aria-hidden="true">&rarr;</span></a>
+          <a class="btn btn--ghost" href="gallery.html">See the Gallery</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section class="section" id="about">
+      <div class="container">
+        <div class="about">
+          <div class="about__body">
+            <p class="eyebrow">The Ranch</p>
+            <h2>The largest, most trusted camel ranch in Oklahoma.</h2>
+            <p>We have spent years building a herd that buyers can stand behind. Every camel at HQ Encounters is raised on our land, handled daily, and halter-started well before it ever meets a new owner. That hands-on upbringing is why our animals arrive calm, sound, and ready to work or show.</p>
+            <p>Health comes first. Each camel is vet-checked, documented, and bred to standards we are willing to put our name on. Whether you want a Dromedary for riding, a Bactrian for cold-country work, or a Hybrid with the best of both, you are buying from people who know the individual animal, not a middleman guessing from a photo.</p>
+            <p>We sell direct, we answer honestly, and we stand behind every camel that leaves the ranch.</p>
+          </div>
+          <div class="collage" id="collage" aria-label="Life on the ranch">
+            <figure><img src="assets/img/ranch-4.jpg" alt="A camel resting by the ranch gate at HQ Encounters" loading="lazy" onerror="this.closest('figure').style.display='none'" /></figure>
+            <figure><img src="assets/img/ranch-1.jpg" alt="A young visitor meeting one of the camels" loading="lazy" onerror="this.closest('figure').style.display='none'" /></figure>
+            <figure><img src="assets/img/ranch-2.jpg" alt="Hand-feeding a camel over the fence" loading="lazy" onerror="this.closest('figure').style.display='none'" /></figure>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <script>
-    const CAD = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 });
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__top">
+        <a class="footer__brand" href="index.html">HQ Encounters</a>
+        <a class="footer__cta" href="listings.html">Browse Our Current Camel Listings <span class="btn__arrow" aria-hidden="true">&rarr;</span></a>
+      </div>
+      <div class="footer__bottom">
+        <span>Oklahoma's premier camel ranch</span>
+        <span><a href="mailto:Hqranchcamels@gmail.com">Hqranchcamels@gmail.com</a> &nbsp;·&nbsp; <a href="tel:+19187063161">+1 (918) 706-3161</a></span>
+      </div>
+    </div>
+  </footer>
 
-    function card(c) {
-      const img = c.mainImage || (c.additionalImages && c.additionalImages[0]) || '';
-      const el = document.createElement('article');
-      el.className = 'card';
-      el.innerHTML = `
-        ${img ? `<img src="${img}" alt="${c.name}" loading="lazy" />` : '<div style="height:180px;background:#e7ddca"></div>'}
-        <div class="body">
-          <div class="badges">
-            <span class="badge">${c.breed}</span>
-            <span class="badge">${c.sex}</span>
-            ${c.ageYears != null ? `<span class="badge">${c.ageYears} yr</span>` : ''}
-          </div>
-          <h2>${c.name}</h2>
-          <div class="price">${c.priceCad != null ? CAD.format(c.priceCad) : 'Inquire'}</div>
-          <p class="desc">${c.shortDescription || ''}</p>
-        </div>`;
-      return el;
-    }
-
-    async function load() {
-      const state = document.getElementById('state');
-      const grid = document.getElementById('grid');
-      try {
-        const res = await fetch('/api/camels');
-        if (!res.ok) throw new Error('Request failed (' + res.status + ')');
-        const camels = await res.json();
-        if (!camels.length) { state.textContent = 'No camels available right now — check back soon.'; return; }
-        state.style.display = 'none';
-        for (const c of camels) grid.appendChild(card(c));
-      } catch (err) {
-        state.textContent = 'Could not load listings. Please try again later.';
-        console.error(err);
-      }
-    }
-    load();
-  </script>
 </body>
 </html>

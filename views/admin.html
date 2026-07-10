@@ -3,128 +3,298 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HQ Ranch — Admin</title>
+  <title>Admin — HQ Encounters</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/site.css" />
   <style>
-    :root { --sand: #c9a25e; --ink: #2a2420; --muted: #7a6f63; --card: #fff; --bg: #f6f1e7; --err: #b3392c; --ok: #3f7a4a; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--ink); background: var(--bg); }
-    header { padding: 1.5rem 1.25rem; display: flex; align-items: center; justify-content: space-between; max-width: 720px; margin: 0 auto; }
-    header h1 { margin: 0; font-size: 1.4rem; }
-    header a { color: var(--muted); font-size: .85rem; text-decoration: none; }
-    header a:hover { text-decoration: underline; }
-    main { max-width: 720px; margin: 0 auto; padding: 0 1.25rem 4rem; }
-    form { background: var(--card); border-radius: 14px; padding: 1.5rem; box-shadow: 0 6px 20px rgba(42,36,32,.08); display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
-    .field { display: flex; flex-direction: column; gap: .3rem; }
-    .field.full { grid-column: 1 / -1; }
-    label { font-size: .85rem; color: var(--muted); }
-    input, select, textarea { padding: .6rem .7rem; border: 1px solid #e2d8c4; border-radius: 8px; font-size: 1rem; font-family: inherit; }
-    textarea { resize: vertical; min-height: 5rem; }
-    button { grid-column: 1 / -1; padding: .8rem; border: none; border-radius: 8px; background: var(--sand); color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; }
-    button:hover { opacity: .9; }
-    .banner { border-radius: 8px; padding: .6rem .8rem; font-size: .9rem; margin-bottom: 1rem; }
-    .banner.error { background: #fbe4e1; color: var(--err); }
-    .banner.success { background: #e4f0e5; color: var(--ok); }
-    .hint { color: var(--muted); font-size: .78rem; }
+    /* Admin console — built on the site.css token system (cream/ink/camel,
+       Marcellus + Hanken). Calmer and denser than the marketing pages. */
+    body { background: var(--cream); }
+
+    .admin-nav {
+      position: sticky; top: 0; z-index: var(--z-nav);
+      background: var(--char);
+      border-bottom: 1px solid rgba(246,241,232,.12);
+    }
+    .admin-nav__inner {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1.25rem; min-height: 64px;
+    }
+    .admin-brand {
+      font-family: var(--display); color: var(--on-char);
+      font-size: 1.2rem; letter-spacing: .02em; text-decoration: none;
+    }
+    .admin-brand span { color: #D9A863; }
+    .admin-nav__links { display: flex; align-items: center; gap: 1.5rem; }
+    .admin-nav__links a {
+      color: var(--on-char-dim); text-decoration: none;
+      font-size: var(--fs-sm); font-weight: 500;
+    }
+    .admin-nav__links a:hover { color: var(--on-char); }
+
+    main.admin { max-width: 1120px; margin-inline: auto; padding: clamp(1.5rem,4vw,2.75rem) var(--pad-x) 5rem; }
+
+    .tabs { display: flex; gap: .35rem; border-bottom: 1px solid var(--line); margin-bottom: 2rem; }
+    .tab {
+      appearance: none; border: none; background: none; cursor: pointer;
+      font-family: var(--sans); font-size: 1rem; font-weight: 600; color: var(--muted);
+      padding: .85rem 1.1rem; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color .2s var(--ease), border-color .2s var(--ease);
+    }
+    .tab:hover { color: var(--ink); }
+    .tab[aria-selected="true"] { color: var(--ink); border-color: var(--camel); }
+
+    .panel[hidden] { display: none; }
+    .panel__head {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap; margin-bottom: 1.75rem;
+    }
+    .panel__head h1 { font-family: var(--display); font-size: var(--fs-h2); margin: 0; }
+    .panel__head p { color: var(--muted); margin: .4rem 0 0; font-size: var(--fs-sm); }
+
+    /* Buttons reuse .btn from site.css; a couple of admin sizes/variants. */
+    .btn--sm { padding: .55rem 1.05rem; font-size: .85rem; }
+    .btn--danger { --btn-bg: #9a3b2f; --btn-fg: #fff; border-color: #9a3b2f; }
+    .btn--quiet {
+      --btn-bg: transparent; --btn-fg: var(--ink); border-color: var(--line-strong);
+    }
+    .btn--quiet:hover { --btn-bg: var(--ink); --btn-fg: var(--cream); border-color: var(--ink); }
+
+    /* Listings grid */
+    .admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 1.25rem; }
+    .admin-card {
+      background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-lg);
+      overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow);
+    }
+    .admin-card__media { aspect-ratio: 4/3; background: var(--cream-deep); position: relative; }
+    .admin-card__media img { width: 100%; height: 100%; object-fit: cover; }
+    .admin-card__media--empty { display: grid; place-items: center; color: var(--line-strong); font-family: var(--display); font-size: 1.8rem; }
+    .admin-card__body { padding: 1rem 1.1rem 1.15rem; display: flex; flex-direction: column; gap: .55rem; flex: 1; }
+    .admin-card__name { font-family: var(--display); font-size: 1.2rem; margin: 0; }
+    .admin-card__meta { color: var(--muted); font-size: .82rem; }
+    .admin-card__actions { display: flex; gap: .5rem; margin-top: auto; padding-top: .6rem; }
+
+    /* Gallery manager */
+    .uploader {
+      background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-lg);
+      padding: 1.25rem; margin-bottom: 1.75rem; display: grid; gap: .9rem;
+      grid-template-columns: 1fr auto; align-items: end;
+    }
+    .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: .9rem; }
+    .gallery-tile { position: relative; border-radius: var(--r); overflow: hidden; background: var(--cream-deep); aspect-ratio: 1; box-shadow: var(--shadow); }
+    .gallery-tile img { width: 100%; height: 100%; object-fit: cover; }
+    .gallery-tile__del {
+      position: absolute; top: .4rem; right: .4rem; width: 2rem; height: 2rem; border-radius: 999px;
+      border: none; cursor: pointer; background: rgba(20,17,14,.6); color: #fff; font-size: 1.1rem; line-height: 1;
+      display: grid; place-items: center; transition: background .2s var(--ease);
+    }
+    .gallery-tile__del:hover { background: #9a3b2f; }
+    .gallery-tile__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: .35rem .5rem; font-size: .72rem; color: #fff; background: linear-gradient(transparent, rgba(20,17,14,.75)); }
+
+    /* Shared field styles */
+    .field { display: flex; flex-direction: column; gap: .35rem; }
+    label { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-soft); }
+    input[type=text], input[type=number], input[type=file], select, textarea {
+      font-family: var(--sans); font-size: 1rem; color: var(--ink);
+      padding: .6rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--r);
+      background: var(--paper); width: 100%;
+    }
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--camel-deep); outline-offset: 1px; }
+    textarea { resize: vertical; min-height: 4.5rem; }
+    .hint { color: var(--muted); font-size: var(--fs-xs); }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: var(--z-backdrop);
+      background: color-mix(in srgb, var(--char) 80%, transparent); backdrop-filter: blur(4px);
+      display: grid; place-items: start center; padding: clamp(1rem,4vw,3rem) 1rem; overflow-y: auto;
+      opacity: 0; visibility: hidden; transition: opacity .25s var(--ease), visibility .25s var(--ease);
+    }
+    .modal-backdrop.open { opacity: 1; visibility: visible; }
+    .modal {
+      background: var(--cream); border-radius: var(--r-lg); box-shadow: var(--shadow-lift);
+      width: min(680px, 100%); transform: translateY(12px); transition: transform .25s var(--ease);
+    }
+    .modal-backdrop.open .modal { transform: translateY(0); }
+    .modal__head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.25rem 1.4rem; border-bottom: 1px solid var(--line);
+    }
+    .modal__head h2 { font-family: var(--display); font-size: 1.5rem; margin: 0; }
+    .modal__close { appearance: none; border: none; background: none; font-size: 1.6rem; cursor: pointer; color: var(--muted); line-height: 1; }
+    .modal__close:hover { color: var(--ink); }
+    .modal__body { padding: 1.4rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .modal__body .full { grid-column: 1 / -1; }
+    .modal__foot {
+      display: flex; justify-content: flex-end; gap: .6rem;
+      padding: 1.1rem 1.4rem; border-top: 1px solid var(--line);
+    }
+
+    /* Thumbnail / additional previews */
+    .thumb-preview { margin-top: .5rem; border-radius: var(--r); overflow: hidden; background: var(--cream-deep); aspect-ratio: 4/3; max-width: 220px; }
+    .thumb-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .thumb-preview:empty { display: none; }
+    .additional-preview { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+    .additional-preview__item { position: relative; width: 72px; height: 72px; border-radius: 6px; overflow: hidden; background: var(--cream-deep); }
+    .additional-preview__item img { width: 100%; height: 100%; object-fit: cover; }
+    .additional-preview__item button {
+      position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 999px; border: none;
+      background: rgba(20,17,14,.7); color: #fff; font-size: .7rem; cursor: pointer; line-height: 1; display: grid; place-items: center;
+    }
+
+    .state { text-align: center; color: var(--muted); padding: 3rem 1rem; font-size: var(--fs-lead); grid-column: 1 / -1; }
+    .toast {
+      position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--ink); color: var(--cream); padding: .75rem 1.15rem; border-radius: 999px;
+      font-size: .9rem; font-weight: 500; box-shadow: var(--shadow-lift); z-index: 1200;
+      opacity: 0; visibility: hidden; transition: opacity .25s var(--ease), transform .25s var(--ease), visibility .25s var(--ease);
+    }
+    .toast.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+    .toast--error { background: #9a3b2f; }
+    .inline-error { color: #9a3b2f; font-size: var(--fs-sm); }
+    .busy { opacity: .5; pointer-events: none; }
+
+    @media (max-width: 620px) {
+      .modal__body { grid-template-columns: 1fr; }
+      .uploader { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Add a camel</h1>
-    <nav>
-      <a href="/">View public listing</a>
-      &nbsp;·&nbsp;
-      <a href="/admin/logout">Log out</a>
-    </nav>
+  <header class="admin-nav">
+    <div class="container admin-nav__inner">
+      <a class="admin-brand" href="/admin">HQ&nbsp;<span>Encounters</span> · Admin</a>
+      <nav class="admin-nav__links">
+        <a href="/" target="_blank" rel="noopener">View site ↗</a>
+        <a href="/admin/logout">Log out</a>
+      </nav>
+    </div>
   </header>
-  <main>
-    <div id="banner" class="banner" hidden></div>
-    <form method="POST" action="/admin/camels" enctype="multipart/form-data">
-      <input type="hidden" id="csrfToken" name="csrfToken" value="" />
-      <div class="field">
-        <label for="name">Name</label>
-        <input type="text" id="name" name="name" maxlength="120" required />
-      </div>
 
-      <div class="field">
-        <label for="breed">Breed</label>
-        <select id="breed" name="breed" required>
-          <option value="Dromedary">Dromedary</option>
-          <option value="Bactrian">Bactrian</option>
-          <option value="Hybrid">Hybrid</option>
-        </select>
-      </div>
+  <main class="admin">
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tab-listings" role="tab" aria-selected="true" aria-controls="panel-listings">Camel Listings</button>
+      <button class="tab" id="tab-gallery" role="tab" aria-selected="false" aria-controls="panel-gallery">Gallery</button>
+    </div>
 
-      <div class="field">
-        <label for="sex">Sex</label>
-        <select id="sex" name="sex" required>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-        </select>
+    <!-- LISTINGS -->
+    <section class="panel" id="panel-listings" role="tabpanel" aria-labelledby="tab-listings">
+      <div class="panel__head">
+        <div>
+          <h1>Camel Listings</h1>
+          <p>Add, edit, and remove the camels shown on the public site.</p>
+        </div>
+        <button class="btn" id="add-camel-btn" type="button">Add Camel <span class="btn__arrow" aria-hidden="true">&rarr;</span></button>
       </div>
-
-      <div class="field">
-        <label for="ageYears">Age (years) — optional</label>
-        <input type="number" id="ageYears" name="ageYears" min="0" max="59" step="1" />
+      <div class="admin-grid" id="listings-grid">
+        <div class="state">Loading listings&hellip;</div>
       </div>
+    </section>
 
-      <div class="field">
-        <label for="priceCad">Price (CAD)</label>
-        <input type="number" id="priceCad" name="priceCad" min="0" step="0.01" required />
+    <!-- GALLERY -->
+    <section class="panel" id="panel-gallery" role="tabpanel" aria-labelledby="tab-gallery" hidden>
+      <div class="panel__head">
+        <div>
+          <h1>Gallery</h1>
+          <p>Upload photos straight to the public gallery. They appear immediately.</p>
+        </div>
       </div>
-
-      <div class="field">
-        <label for="status">Status</label>
-        <select id="status" name="status" required>
-          <option value="draft">Draft</option>
-          <option value="active" selected>Active</option>
-          <option value="pending_sale">Pending sale</option>
-          <option value="sold">Sold</option>
-          <option value="withdrawn">Withdrawn</option>
-        </select>
-        <span class="hint">Only "active" camels show on the public listing.</span>
+      <form class="uploader" id="gallery-form">
+        <div class="field">
+          <label for="gallery-files">Photos</label>
+          <input type="file" id="gallery-files" name="photos" accept="image/*" multiple required />
+          <span class="hint">JPEG, PNG, WebP or GIF · up to 5MB each · select several at once.</span>
+        </div>
+        <button class="btn btn--sm" type="submit" id="gallery-upload-btn">Upload</button>
+      </form>
+      <div class="gallery-grid" id="gallery-grid">
+        <div class="state">Loading gallery&hellip;</div>
       </div>
-
-      <div class="field full">
-        <label for="shortDescription">Short description</label>
-        <input type="text" id="shortDescription" name="shortDescription" maxlength="200" required />
-      </div>
-
-      <div class="field full">
-        <label for="longDescription">Long description</label>
-        <textarea id="longDescription" name="longDescription" maxlength="4000" required></textarea>
-      </div>
-
-      <div class="field full">
-        <label for="mainImage">Main image — optional</label>
-        <input type="file" id="mainImage" name="mainImage" accept="image/*" />
-      </div>
-
-      <div class="field full">
-        <label for="additionalImages">Additional images — optional</label>
-        <input type="file" id="additionalImages" name="additionalImages" accept="image/*" multiple />
-      </div>
-
-      <button type="submit">Add camel</button>
-    </form>
+    </section>
   </main>
-  <script>
-    function getCookie(name) {
-      const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-      return match ? decodeURIComponent(match[1]) : '';
-    }
-    document.getElementById('csrfToken').value = getCookie('hq_admin_csrf');
 
-    const params = new URLSearchParams(location.search);
-    const banner = document.getElementById('banner');
-    if (params.get('success')) {
-      banner.textContent = 'Camel added successfully.';
-      banner.classList.add('success');
-      banner.hidden = false;
-    } else if (params.get('error')) {
-      banner.textContent = params.get('error');
-      banner.classList.add('error');
-      banner.hidden = false;
-    }
-  </script>
+  <!-- CAMEL MODAL -->
+  <div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <div class="modal__head">
+        <h2 id="modal-title">Add Camel</h2>
+        <button class="modal__close" id="modal-close" type="button" aria-label="Close">&times;</button>
+      </div>
+      <form id="camel-form">
+        <div class="modal__body">
+          <div class="field full">
+            <label for="f-mainImage">Thumbnail (primary photo) <span aria-hidden="true">*</span></label>
+            <input type="file" id="f-mainImage" name="mainImage" accept="image/*" />
+            <span class="hint">Shown on the listing card. Required for a new camel.</span>
+            <div class="thumb-preview" id="thumb-preview"></div>
+          </div>
+
+          <div class="field">
+            <label for="f-name">Name *</label>
+            <input type="text" id="f-name" name="name" maxlength="120" required />
+          </div>
+          <div class="field">
+            <label for="f-age">Age (years) *</label>
+            <input type="number" id="f-age" name="ageYears" min="0" max="59" step="1" required />
+          </div>
+
+          <div class="field">
+            <label for="f-sex">Gender *</label>
+            <select id="f-sex" name="sex" required>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-paint">Paint type *</label>
+            <select id="f-paint" name="paintColor" required>
+              <option value="Paint">Paint</option>
+              <option value="Chocolate">Chocolate</option>
+              <option value="White">White</option>
+            </select>
+          </div>
+
+          <div class="field full">
+            <label for="f-breed">Camel type *</label>
+            <select id="f-breed" name="breed" required>
+              <option value="Dromedary">Dromedary</option>
+              <option value="Bactrian">Bactrian</option>
+              <option value="Hybrid">Hybrid</option>
+            </select>
+          </div>
+
+          <div class="field full">
+            <label for="f-short">Short description *</label>
+            <input type="text" id="f-short" name="shortDescription" maxlength="200" required />
+            <span class="hint">One line shown on the listing card.</span>
+          </div>
+          <div class="field full">
+            <label for="f-long">Full description *</label>
+            <textarea id="f-long" name="longDescription" maxlength="4000" required></textarea>
+            <span class="hint">Shown when a buyer opens the camel's detail view.</span>
+          </div>
+
+          <div class="field full">
+            <label for="f-additional">Additional photos</label>
+            <input type="file" id="f-additional" name="additionalImages" accept="image/*" multiple />
+            <span class="hint">Not shown on the card — only inside the camel's detail view.</span>
+            <div class="additional-preview" id="additional-preview"></div>
+          </div>
+
+          <p class="inline-error full" id="modal-error" hidden></p>
+        </div>
+        <div class="modal__foot">
+          <button class="btn btn--quiet btn--sm" type="button" id="modal-cancel">Cancel</button>
+          <button class="btn btn--sm" type="submit" id="modal-save">Save camel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/assets/admin.js"></script>
 </body>
 </html>

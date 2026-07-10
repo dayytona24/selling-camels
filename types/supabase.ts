@@ -55,7 +55,7 @@ export type Database = {
           long_description: string
           main_image: string | null
           name: string
-          price_cad: number
+          paint_color: string | null
           seller_id: string
           sex: string
           short_description: string
@@ -70,7 +70,7 @@ export type Database = {
           long_description: string
           main_image?: string | null
           name: string
-          price_cad: number
+          paint_color?: string | null
           seller_id: string
           sex: string
           short_description: string
@@ -85,7 +85,7 @@ export type Database = {
           long_description?: string
           main_image?: string | null
           name?: string
-          price_cad?: number
+          paint_color?: string | null
           seller_id?: string
           sex?: string
           short_description?: string
@@ -101,6 +101,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      gallery_photos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          photo_url: string
+          sort_order: number
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          photo_url: string
+          sort_order?: number
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          photo_url?: string
+          sort_order?: number
+        }
+        Relationships: []
       }
       inquiries: {
         Row: {

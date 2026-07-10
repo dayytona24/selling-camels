@@ -1,40 +1,49 @@
 // HQ Ranch camel marketplace — Express server backed by Supabase (Postgres).
 //
 // Data access goes through the Supabase JS client (service-role key, RLS
-// bypassed) built in lib/supabase.js. Images are still uploaded via multer to
-// an on-disk uploads/ directory (a Railway volume in production) and served
-// statically — we are intentionally NOT using Supabase Storage yet.
+// bypassed) built in lib/supabase.js. Image uploads are buffered in memory and
+// streamed to a PUBLIC Supabase Storage bucket (see lib/storage.js) so the
+// resulting absolute URLs resolve from every deploy target (GitHub Pages,
+// Railway, direct Supabase reads) — we no longer write to local disk.
 //
-// API contract (camelCase JSON, `camelFromRecord` shape):
+// Public JSON (camelCase, read directly by the static sites too):
 //   GET    /api/camels              public  — active listings only
+//   GET    /api/gallery             public  — all gallery photos
+//
+// Basic-auth JSON API (ADMIN_USER / ADMIN_PASSWORD):
 //   GET    /api/admin/camels        admin   — all statuses
 //   GET    /api/admin/camels/:id    admin
 //   POST   /api/admin/camels        admin   — create
 //   PUT    /api/admin/camels/:id    admin   — update
 //   DELETE /api/admin/camels/:id    admin   — delete
 //
-// Admin routes are protected by HTTP Basic auth (ADMIN_USER / ADMIN_PASSWORD).
-//
-// Browser admin UI (session-cookie auth, separate from the API above):
-//   GET/POST /admin/login   public  — password form (ADMIN_PASSWORD, rate-limited)
-//   GET      /admin         session — add-camel form
-//   POST     /admin/camels  session + CSRF token — create (redirects back to /admin)
-//   GET      /admin/logout  session — clears the session + CSRF cookies
+// Browser admin console (session-cookie auth + CSRF, separate from the above):
+//   GET/POST /admin/login        public  — password form (ADMIN_PASSWORD, rate-limited)
+//   GET      /admin              session — the admin console SPA
+//   GET      /admin/logout       session — clears the session + CSRF cookies
+//   GET/POST/PUT/DELETE /admin/api/camels[/:id]   session + CSRF — listings CRUD (JSON)
+//   GET/POST/DELETE     /admin/api/gallery[/:id]  session + CSRF — gallery manager (JSON)
+//   POST     /admin/camels       session + CSRF — legacy full-page create (kept for compat)
 
 import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
 import path from 'node:path';
-import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { getSupabase, getHouseSellerId } from './lib/supabase.js';
+import {
+  imageFileFilter,
+  uploadImage,
+  uploadImages,
+  deleteManyByPublicUrl,
+  MAX_FILE_BYTES,
+} from './lib/storage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = process.env.PORT || 3000;
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const VIEWS_DIR = path.join(__dirname, 'views');
 
@@ -42,7 +51,7 @@ const VIEWS_DIR = path.join(__dirname, 'views');
 // 400s instead of opaque Postgres constraint-violation errors.
 const BREEDS = ['Dromedary', 'Bactrian', 'Hybrid'];
 const SEXES = ['male', 'female'];
-const STATUSES = ['draft', 'active', 'pending_sale', 'sold', 'withdrawn'];
+const PAINT_COLORS = ['Paint', 'Chocolate', 'White'];
 
 // --- Supabase client + house seller resolved once at boot (fail fast) --------
 // Touch the client and the house seller id up front so a misconfigured
@@ -51,25 +60,21 @@ const supabase = getSupabase();
 const HOUSE_SELLER_ID = getHouseSellerId();
 
 // --- Uploads ----------------------------------------------------------------
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const base = crypto.randomBytes(16).toString('hex');
-    cb(null, `${base}${ext}`);
-  },
-});
+// Files are buffered in memory (never written to local disk) and streamed to
+// Supabase Storage — see lib/storage.js for why. The MIME allowlist + size cap
+// are enforced here at the multer layer and again in the storage helper.
 const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_BYTES },
+  fileFilter: imageFileFilter,
 });
 // Admin create/update accept an optional single main image + many extra images.
 const uploadFields = upload.fields([
   { name: 'mainImage', maxCount: 1 },
   { name: 'additionalImages', maxCount: 20 },
 ]);
+// Gallery accepts a batch of photos under a single field.
+const uploadGallery = upload.array('photos', 30);
 
 // --- App --------------------------------------------------------------------
 const app = express();
@@ -80,7 +85,6 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(UPLOAD_DIR));
 app.use(express.static(PUBLIC_DIR));
 
 // --- Basic auth for /api/admin ----------------------------------------------
@@ -195,12 +199,33 @@ function sessionCookieOptions(req, { httpOnly }) {
 // hidden form field.
 const CSRF_COOKIE = 'hq_admin_csrf';
 
+// Accepts the echoed token either as a form field (classic form POST) or as an
+// X-CSRF-Token header (fetch-based JSON/multipart calls from the admin console).
+// A cross-site page can neither read the cookie to forge the field nor set a
+// custom request header cross-origin, so the double-submit guarantee holds for
+// both. `json` controls whether a failure is a JSON 403 or a redirect.
+function csrfTokenFromRequest(req) {
+  if (req.body && typeof req.body.csrfToken === 'string' && req.body.csrfToken) {
+    return req.body.csrfToken;
+  }
+  const header = req.get('x-csrf-token');
+  return typeof header === 'string' ? header : '';
+}
+
+function checkCsrf(req) {
+  const cookieToken = parseCookies(req)[CSRF_COOKIE];
+  const submitted = csrfTokenFromRequest(req);
+  return Boolean(cookieToken && submitted && timingSafeEqual(cookieToken, submitted));
+}
+
 function requireCsrf(req, res, next) {
-  const cookies = parseCookies(req);
-  const cookieToken = cookies[CSRF_COOKIE];
-  const bodyToken = typeof req.body.csrfToken === 'string' ? req.body.csrfToken : '';
-  if (cookieToken && bodyToken && timingSafeEqual(cookieToken, bodyToken)) return next();
+  if (checkCsrf(req)) return next();
   return res.redirect(`/admin?error=${encodeURIComponent('Your session expired. Please reload the page and try again.')}`);
+}
+
+function requireCsrfJson(req, res, next) {
+  if (checkCsrf(req)) return next();
+  return res.status(403).json({ error: 'Invalid or missing CSRF token. Reload the page and try again.' });
 }
 
 // --- Login rate limiting -----------------------------------------------------
@@ -245,9 +270,8 @@ function camelFromRecord(row) {
     breed: row.breed,
     type: row.breed, // legacy alias
     sex: row.sex,
+    paintColor: row.paint_color ?? null,
     ageYears: row.age_years === null || row.age_years === undefined ? null : Number(row.age_years),
-    priceCad: row.price_cad === null || row.price_cad === undefined ? null : Number(row.price_cad),
-    status: row.status,
     mainImage: row.main_image ?? null,
     additionalImages: images.map((img) => img.url),
     shortDescription: row.short_description,
@@ -264,10 +288,11 @@ function firstFile(files, field) {
   return files && files[field] && files[field][0] ? files[field][0] : null;
 }
 
-// Resolve the list of additional image URLs from a request. Newly uploaded
-// files (multer) become /uploads/<name>; any URLs passed in the body (e.g.
-// existing images to keep on update) are preserved. Uploaded files come last.
-function resolveAdditionalImages(body, files) {
+// Resolve the list of additional image URLs from a request. Any URLs passed in
+// the body (e.g. existing images to keep on update) are preserved; newly
+// uploaded files are streamed to Supabase Storage and their absolute public
+// URLs are appended after them. Async because it performs the uploads.
+async function resolveAdditionalImages(body, files) {
   const urls = [];
 
   const raw = body.additionalImages;
@@ -295,14 +320,15 @@ function resolveAdditionalImages(body, files) {
   }
 
   const uploaded = (files && files.additionalImages) || [];
-  for (const f of uploaded) urls.push(`/uploads/${f.filename}`);
+  const newUrls = await uploadImages(supabase, uploaded, 'camels');
+  for (const url of newUrls) urls.push(url);
 
   return urls;
 }
 
-function resolveMainImage(body, files) {
+async function resolveMainImage(body, files) {
   const file = firstFile(files, 'mainImage');
-  if (file) return `/uploads/${file.filename}`;
+  if (file) return uploadImage(supabase, file, 'camels');
   if (typeof body.mainImage === 'string' && body.mainImage.trim()) return body.mainImage.trim();
   return undefined; // undefined => "not provided", null would mean "clear it"
 }
@@ -339,15 +365,6 @@ function buildCamelRecord(body, { partial }) {
     errors.push('sex is required.');
   }
 
-  if (has('priceCad')) {
-    const r = toNumberOrError(body.priceCad, 'priceCad');
-    if (r.error) errors.push(r.error);
-    else if (r.value < 0) errors.push('priceCad must be >= 0.');
-    else record.price_cad = r.value;
-  } else if (!partial) {
-    errors.push('priceCad is required.');
-  }
-
   if (has('shortDescription')) record.short_description = String(body.shortDescription);
   else if (!partial) errors.push('shortDescription is required.');
 
@@ -364,9 +381,12 @@ function buildCamelRecord(body, { partial }) {
     record.age_years = null;
   }
 
-  if (has('status')) {
-    if (!STATUSES.includes(body.status)) errors.push(`status must be one of: ${STATUSES.join(', ')}.`);
-    else record.status = body.status;
+  // Paint color is optional; an empty submission clears it.
+  if (has('paintColor')) {
+    if (!PAINT_COLORS.includes(body.paintColor)) errors.push(`paintColor must be one of: ${PAINT_COLORS.join(', ')}.`);
+    else record.paint_color = body.paintColor;
+  } else if (body.paintColor === null || body.paintColor === '') {
+    record.paint_color = null;
   }
 
   if (errors.length > 0) return { error: errors.join(' ') };
@@ -406,6 +426,33 @@ app.get('/api/camels', asyncHandler(async (_req, res) => {
   res.json(data.map(camelFromRecord));
 }));
 
+// --- Gallery serialization + reads ------------------------------------------
+function galleryFromRecord(row) {
+  return {
+    id: row.id,
+    photoUrl: row.photo_url,
+    caption: row.caption ?? null,
+    sortOrder: row.sort_order ?? 0,
+    createdAt: row.created_at,
+  };
+}
+
+async function listGalleryPhotos() {
+  const { data, error } = await supabase
+    .from('gallery_photos')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data.map(galleryFromRecord);
+}
+
+// Public: all gallery photos. (The static sites read Supabase directly via the
+// anon key; this mirror endpoint exists for parity with /api/camels.)
+app.get('/api/gallery', asyncHandler(async (_req, res) => {
+  res.json(await listGalleryPhotos());
+}));
+
 // Admin: list all statuses.
 app.get('/api/admin/camels', requireAdmin, asyncHandler(async (_req, res) => {
   const { data, error } = await supabase
@@ -434,7 +481,7 @@ async function createCamelFromRequest(body, files) {
   const { record, error } = buildCamelRecord(body, { partial: false });
   if (error) return { error };
 
-  const mainImage = resolveMainImage(body, files);
+  const mainImage = await resolveMainImage(body, files);
   if (mainImage !== undefined) record.main_image = mainImage;
   record.seller_id = HOUSE_SELLER_ID;
 
@@ -445,7 +492,7 @@ async function createCamelFromRequest(body, files) {
     .single();
   if (insErr) return { error: insErr.message };
 
-  const additional = resolveAdditionalImages(body, files);
+  const additional = await resolveAdditionalImages(body, files);
   await replaceCamelImages(data.id, additional);
 
   const { data: full, error: readErr } = await supabase
@@ -464,14 +511,14 @@ app.post('/api/admin/camels', requireAdmin, uploadFields, asyncHandler(async (re
   res.status(201).json(camel);
 }));
 
-// Admin: update (partial — only provided fields change).
-app.put('/api/admin/camels/:id', requireAdmin, uploadFields, asyncHandler(async (req, res) => {
-  const id = req.params.id;
+// Shared update logic (partial — only provided fields change) for both the
+// Basic-auth API and the session admin console. Returns { camel } | { error } |
+// { notFound }.
+async function updateCamelFromRequest(id, body, files) {
+  const { record, error } = buildCamelRecord(body, { partial: true });
+  if (error) return { error };
 
-  const { record, error } = buildCamelRecord(req.body, { partial: true });
-  if (error) return res.status(400).json({ error });
-
-  const mainImage = resolveMainImage(req.body, req.files);
+  const mainImage = await resolveMainImage(body, files);
   if (mainImage !== undefined) record.main_image = mainImage;
   record.updated_at = new Date().toISOString();
 
@@ -481,15 +528,15 @@ app.put('/api/admin/camels/:id', requireAdmin, uploadFields, asyncHandler(async 
     .eq('id', id)
     .select('id')
     .maybeSingle();
-  if (updErr) return res.status(400).json({ error: updErr.message });
-  if (!updated) return res.status(404).json({ error: 'Camel not found.' });
+  if (updErr) return { error: updErr.message };
+  if (!updated) return { notFound: true };
 
   // Only touch images if the request actually carried image info.
   const sentImages =
-    req.body.additionalImages !== undefined ||
-    (req.files && req.files.additionalImages && req.files.additionalImages.length > 0);
+    body.additionalImages !== undefined ||
+    (files && files.additionalImages && files.additionalImages.length > 0);
   if (sentImages) {
-    await replaceCamelImages(id, resolveAdditionalImages(req.body, req.files));
+    await replaceCamelImages(id, await resolveAdditionalImages(body, files));
   }
 
   const { data: full, error: readErr } = await supabase
@@ -498,12 +545,26 @@ app.put('/api/admin/camels/:id', requireAdmin, uploadFields, asyncHandler(async 
     .eq('id', id)
     .single();
   if (readErr) throw readErr;
-  res.json(camelFromRecord(full));
+  return { camel: camelFromRecord(full) };
+}
+
+// Admin: update (partial — only provided fields change).
+app.put('/api/admin/camels/:id', requireAdmin, uploadFields, asyncHandler(async (req, res) => {
+  const result = await updateCamelFromRequest(req.params.id, req.body, req.files);
+  if (result.error) return res.status(400).json({ error: result.error });
+  if (result.notFound) return res.status(404).json({ error: 'Camel not found.' });
+  res.json(result.camel);
 }));
 
-// Admin: delete (remove child images first to satisfy the FK).
-app.delete('/api/admin/camels/:id', requireAdmin, asyncHandler(async (req, res) => {
-  const id = req.params.id;
+// Shared delete logic: remove child images (FK) + the camel, then best-effort
+// clean up the associated Storage objects. Returns { ok } or { notFound }.
+async function deleteCamelById(id) {
+  // Gather the object URLs first so we can clean Storage after the DB rows go.
+  const { data: full } = await supabase
+    .from('camels')
+    .select('main_image, camel_images(url)')
+    .eq('id', id)
+    .maybeSingle();
 
   const { error: imgErr } = await supabase.from('camel_images').delete().eq('camel_id', id);
   if (imgErr) throw imgErr;
@@ -515,8 +576,20 @@ app.delete('/api/admin/camels/:id', requireAdmin, asyncHandler(async (req, res) 
     .select('id')
     .maybeSingle();
   if (error) throw error;
-  if (!data) return res.status(404).json({ error: 'Camel not found.' });
-  res.json({ ok: true, id });
+  if (!data) return { notFound: true };
+
+  if (full) {
+    const urls = [full.main_image, ...((full.camel_images || []).map((i) => i.url))].filter(Boolean);
+    await deleteManyByPublicUrl(supabase, urls);
+  }
+  return { ok: true };
+}
+
+// Admin: delete.
+app.delete('/api/admin/camels/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await deleteCamelById(req.params.id);
+  if (result.notFound) return res.status(404).json({ error: 'Camel not found.' });
+  res.json({ ok: true, id: req.params.id });
 }));
 
 // --- Browser-facing admin pages (session-cookie auth, separate from the ------
@@ -564,15 +637,98 @@ app.post('/admin/camels', requireAdminSession, uploadFields, requireCsrf, asyncH
   res.redirect('/admin?success=1');
 }));
 
-// Multer error surfacing (e.g. file too large).
-app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
-    if (req.path === '/admin/camels') {
-      return res.redirect(`/admin?error=${encodeURIComponent('Upload error: ' + err.message)}`);
-    }
-    return res.status(400).json({ error: `Upload error: ${err.message}` });
+// --- Session admin JSON API (the admin console fetches these) ----------------
+// Same session-cookie gate as the pages above, plus CSRF on every mutation.
+// Returns JSON (no redirects) so the SPA-style admin can add/edit/delete without
+// a page reload. Distinct from the Basic-auth /api/admin/* API.
+
+app.get('/admin/api/camels', requireAdminSession, asyncHandler(async (_req, res) => {
+  const { data, error } = await supabase
+    .from('camels')
+    .select(SELECT_WITH_IMAGES)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  res.json(data.map(camelFromRecord));
+}));
+
+app.post('/admin/api/camels', requireAdminSession, uploadFields, requireCsrfJson, asyncHandler(async (req, res) => {
+  const { camel, error } = await createCamelFromRequest(req.body, req.files);
+  if (error) return res.status(400).json({ error });
+  res.status(201).json(camel);
+}));
+
+app.put('/admin/api/camels/:id', requireAdminSession, uploadFields, requireCsrfJson, asyncHandler(async (req, res) => {
+  const result = await updateCamelFromRequest(req.params.id, req.body, req.files);
+  if (result.error) return res.status(400).json({ error: result.error });
+  if (result.notFound) return res.status(404).json({ error: 'Camel not found.' });
+  res.json(result.camel);
+}));
+
+app.delete('/admin/api/camels/:id', requireAdminSession, requireCsrfJson, asyncHandler(async (req, res) => {
+  const result = await deleteCamelById(req.params.id);
+  if (result.notFound) return res.status(404).json({ error: 'Camel not found.' });
+  res.json({ ok: true, id: req.params.id });
+}));
+
+app.get('/admin/api/gallery', requireAdminSession, asyncHandler(async (_req, res) => {
+  res.json(await listGalleryPhotos());
+}));
+
+// Upload one or more gallery photos. They appear on the public gallery
+// immediately (no separate publish step). New photos sort after existing ones.
+app.post('/admin/api/gallery', requireAdminSession, uploadGallery, requireCsrfJson, asyncHandler(async (req, res) => {
+  const files = req.files || [];
+  if (files.length === 0) return res.status(400).json({ error: 'Select at least one photo to upload.' });
+
+  const { data: maxRow } = await supabase
+    .from('gallery_photos')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let next = (maxRow && Number.isFinite(maxRow.sort_order) ? maxRow.sort_order : 0) + 1;
+
+  const urls = await uploadImages(supabase, files, 'gallery');
+  const caption = typeof req.body.caption === 'string' && req.body.caption.trim()
+    ? req.body.caption.trim()
+    : null;
+  const rows = urls.map((url) => ({ photo_url: url, caption, sort_order: next++ }));
+
+  const { data, error } = await supabase.from('gallery_photos').insert(rows).select('*');
+  if (error) {
+    await deleteManyByPublicUrl(supabase, urls); // roll back orphaned objects
+    return res.status(400).json({ error: error.message });
   }
-  return next(err);
+  res.status(201).json(data.map(galleryFromRecord));
+}));
+
+app.delete('/admin/api/gallery/:id', requireAdminSession, requireCsrfJson, asyncHandler(async (req, res) => {
+  const { data, error } = await supabase
+    .from('gallery_photos')
+    .delete()
+    .eq('id', req.params.id)
+    .select('photo_url')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return res.status(404).json({ error: 'Photo not found.' });
+  await deleteManyByPublicUrl(supabase, [data.photo_url]);
+  res.json({ ok: true, id: req.params.id });
+}));
+
+// Upload error surfacing. Covers both multer's own errors (e.g. file too large)
+// and the plain Error our fileFilter throws for a disallowed MIME type.
+app.use((err, req, res, next) => {
+  const isUpload =
+    err instanceof multer.MulterError ||
+    (err instanceof Error && /Unsupported file type/.test(err.message));
+  if (!isUpload) return next(err);
+
+  const message = `Upload error: ${err.message}`;
+  // The legacy full-page form redirects; everything else (JSON APIs) gets JSON.
+  if (req.path === '/admin/camels') {
+    return res.redirect(`/admin?error=${encodeURIComponent(message)}`);
+  }
+  return res.status(400).json({ error: message });
 });
 
 app.listen(PORT, () => {

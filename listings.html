@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Camels for Sale — HQ Encounters</title>
+  <meta name="description" content="Browse premium Dromedary, Bactrian, and Hybrid camels available now at HQ Encounters, Oklahoma's largest camel ranch." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="container nav__inner">
+      <a class="brand" href="index.html">HQ&nbsp;<span>Encounters</span></a>
+      <nav class="nav__links" aria-label="Primary">
+        <a href="index.html">Ranch</a>
+        <a href="listings.html" aria-current="page">Camels</a>
+        <a href="gallery.html">Gallery</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="container">
+        <div class="section__head">
+          <p class="eyebrow">Available Now</p>
+          <h2>Camels for Sale</h2>
+          <p>Each animal below is on the ranch today, health-verified, and ready for a serious buyer. Found one you like? Send us a note and we will tell you everything about it.</p>
+        </div>
+        <div class="grid-cards" id="grid">
+          <div class="state" id="state">Loading available camels&hellip;</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact / close-the-sale -->
+    <section class="contact" id="contact">
+      <div class="container contact__inner">
+        <p class="eyebrow" style="color:#E6C79A;">Ready to buy</p>
+        <h2>Ready to Add to Your Herd? Contact Us Directly to Purchase.</h2>
+        <p class="lead">No forms, no waiting. Reach us directly and we will walk you through the camel, the paperwork, and delivery.</p>
+        <div class="contact__methods">
+          <a class="contact__method" href="mailto:Hqranchcamels@gmail.com">
+            <div class="label">Email</div>
+            <div class="value">Hqranchcamels@gmail.com</div>
+          </a>
+          <a class="contact__method" href="tel:+19187063161">
+            <div class="label">Phone</div>
+            <div class="value">+1 (918) 706-3161</div>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__top">
+        <a class="footer__brand" href="index.html">HQ Encounters</a>
+        <a class="footer__cta" href="gallery.html">Browse the Full Gallery <span class="btn__arrow" aria-hidden="true">&rarr;</span></a>
+      </div>
+      <div class="footer__bottom">
+        <span>Oklahoma's premier camel ranch</span>
+        <span><a href="mailto:Hqranchcamels@gmail.com">Hqranchcamels@gmail.com</a> &nbsp;·&nbsp; <a href="tel:+19187063161">+1 (918) 706-3161</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/site.js"></script>
+  <script>
+    (async function () {
+      var grid = document.getElementById("grid");
+      var state = document.getElementById("state");
+      try {
+        var camels = await HQ.fetchActiveCamels();
+        if (!camels.length) {
+          state.textContent = "No camels available right now. Check back soon, or reach out below.";
+          return;
+        }
+        state.remove();
+        camels.forEach(function (c) { grid.appendChild(HQ.renderCard(c)); });
+      } catch (err) {
+        state.className = "state state--error";
+        state.textContent = "We couldn't load the listings just now. Please refresh, or contact us below.";
+        console.error(err);
+      }
+    })();
+  </script>
+</body>
+</html>
